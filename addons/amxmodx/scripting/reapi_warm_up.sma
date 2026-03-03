@@ -8,7 +8,7 @@
 #define URL "None"
 #define DESCRIPTIONPLUGIN "Plugin for Warm Up"
 
-#define IsPlayer(%1)    (1 <= %1 <= g_iMaxPlayers)	//	Проверяем, что это игрок,  а не какой либо объект.
+#define IsPlayer(%1)    (1 <= %1 && %1 <= g_iMaxPlayers)	//	Проверяем, что это игрок,  а не какой либо объект.
 #define ClearArr(%1)    arrayset(_:%1, _:0.0, sizeof(%1))	//	Очищаем массив
 
 enum _:ePlayerData
@@ -83,7 +83,7 @@ new Array:g_aWarm, Array:g_aPlugins;
 new HookChain:g_hCheckMapConditions, HookChain:g_hDropPlayerItem, HookChain:g_hOnSpawnEquip, HookChain:g_hKilled;
 
 new g_pDefaultCvars[sizeof(g_eCvarsToDisable)][64], g_pCvar[CVARS];
-new g_szWarmUpDescription[64], g_szWarmUpTrack[128], Float:g_flMaxHealth, g_iCountDown, g_iSection, g_iTrackTime;
+new g_szWarmUpDescription[64], g_szWarmUpTrack[128], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", Float:g_flMaxHealth, g_iCountDown, g_iSection, g_iTrackTime;
 
 /* top 5*/
 new g_arrData[MAX_PLAYERS + 1][ePlayerData];
@@ -95,6 +95,7 @@ new g_iCounter = 0;	//	Счетчик для тайминга отображен
 new g_iOriginal_sv_maxspeed = 320;	//	Скорость по умолчанию
 new cvar_name_sv_maxspeed;
 new g_iPlayerTop = 0;
+new g_iTopPlayersCount = 0;
 
 
 public plugin_precache()
@@ -105,6 +106,8 @@ public plugin_precache()
 	
 	if (!ReadConfig())
 		set_fail_state("Something went wrong");
+
+	LoadWarmUpMusic();
 	
 	precache_sound("weapons/deagle-1.wav");
 	precache_sound("events/task_complete.wav");
@@ -120,10 +123,9 @@ public plugin_init()
 	DisableHookChain(g_hDropPlayerItem = RegisterHookChain(RG_CBasePlayer_DropPlayerItem, "CBasePlayer_DropPlayerItem", false));
 	DisableHookChain(g_hOnSpawnEquip = RegisterHookChain(RG_CBasePlayer_OnSpawnEquip, "CBasePlayer_OnSpawnEquip", true));
 	
-	/*top 5 */
+		/*top 5 */
 	RegisterHookChain(RG_CSGameRules_RestartRound, "CSGameRules_RestartRound_Post", true);
 	RegisterHookChain(RG_CBasePlayer_TakeDamage, "CBasePlayer_TakeDamage", true);
-	RegisterHookChain(RG_CBasePlayer_Killed, "CBasePlayer_Killed", true);
 	g_iMaxPlayers = get_member_game(m_nMaxPlayers);
 	cvar_name_sv_maxspeed = get_cvar_pointer( "sv_maxspeed" );
 	
@@ -185,6 +187,15 @@ public CSGameRules_CheckMapConditions()
 	
 	copy(g_szWarmUpDescription, charsmax(g_szWarmUpDescription), aWarm[DESCRIPTION]);
 	copy(g_szWarmUpTrack, charsmax(g_szWarmUpTrack), aWarm[TRACK]);
+
+	new bool:bRandomTrackPlayed = false;
+	if (g_szMapWarmUpMusic[0])
+	{
+		bRandomTrackPlayed = true;
+		GetTrackName(g_szMapWarmUpMusic, g_szWarmUpTrack, charsmax(g_szWarmUpTrack));
+		g_iTrackTime = g_iCountDown;
+		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^\"sound/%s^\"", g_szMapWarmUpMusic);
+	}
 	
 	// 
 	FillWeapons(aWarm[GUNS]);
@@ -196,9 +207,9 @@ public CSGameRules_CheckMapConditions()
 	for (new i; i < ArraySize(g_aPlugins); i++)
 		pause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 	
-	//
-	if (aWarm[MUSIC][0]) {
-		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^"sound/%s^"", aWarm[MUSIC]);
+	// Fallback: если папка с музыкой пуста, играем трек из конфигурации.
+	if (!bRandomTrackPlayed && aWarm[MUSIC][0]) {
+		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^\"sound/%s^\"", aWarm[MUSIC]);
 	}
 }
 
@@ -233,7 +244,7 @@ public Show_Timer()
 {
 	if (--g_iCountDown == 0)
 	{
-		remove_task();
+		remove_task(0);
 		
 		g_iOriginal_sv_maxspeed = get_pcvar_num(cvar_name_sv_maxspeed);
 		log_amx("g_fOriginal_sv_maxspeed = %f", g_iOriginal_sv_maxspeed);
@@ -300,6 +311,10 @@ stock FillWeapons(szGun[])
 		szSecondaryWeapon[128],
 		szGrenade[64],
 		szWeapon[11];
+
+	szPrimaryWeapon[0] = '^0';
+	szSecondaryWeapon[0] = '^0';
+	szGrenade[0] = '^0';
 	
 	new bool:bKnife = false;
 	new value;
@@ -390,6 +405,57 @@ stock FillWeapons(szGun[])
 	TrieDestroy(tKnife);
 }
 
+
+stock LoadWarmUpMusic()
+{
+	g_szMapWarmUpMusic[0] = '^0';
+
+	new szFile[MAX_RESOURCE_PATH_LENGTH], FileType:iType;
+	new szFolderPath[MAX_RESOURCE_PATH_LENGTH];
+	formatex(szFolderPath, charsmax(szFolderPath), "sound/%s", g_szWarmUpMusicDir);
+
+	new Dir:hDir = open_dir(szFolderPath, szFile, charsmax(szFile), iType);
+
+	if (!hDir)
+		return;
+
+	new iFoundTracks;
+	do
+	{
+		if (iType != FileType_File)
+			continue;
+
+		if (containi(szFile, ".mp3") == -1)
+			continue;
+
+		iFoundTracks++;
+		if (random_num(1, iFoundTracks) == 1)
+			formatex(g_szMapWarmUpMusic, charsmax(g_szMapWarmUpMusic), "%s/%s", g_szWarmUpMusicDir, szFile);
+	}
+	while (next_file(hDir, szFile, charsmax(szFile), iType));
+
+	close_dir(hDir);
+
+	if (g_szMapWarmUpMusic[0])
+		precache_generic(fmt("sound/%s", g_szMapWarmUpMusic));
+}
+
+stock GetTrackName(const szPath[], szTrack[], iLen)
+{
+	new iLastSlash = -1;
+	for (new i; szPath[i] != '^0'; i++)
+	{
+		if (szPath[i] == '/')
+			iLastSlash = i;
+	}
+
+	copy(szTrack, iLen, szPath[(iLastSlash + 1)]);
+
+	new iExt = containi(szTrack, ".mp3");
+	if (iExt != -1)
+		szTrack[iExt] = '^0';
+}
+
 ReadConfig()
 {
 	new szPath[PLATFORM_MAX_PATH];
@@ -452,6 +518,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				g_pCvar[AUTO_AMMO] = str_to_num(value);
 			if (equal(key, "PAUSE_STATS"))
 				g_pCvar[PAUSE_STATS] = str_to_num(value);
+			if (equal(key, "MUSIC_FOLDER"))
+				copy(g_szWarmUpMusicDir, charsmax(g_szWarmUpMusicDir), value);
 		}
 		
 		case PLUGINS:
@@ -515,6 +583,8 @@ public fnCompareDamage()
 	new iPlayers[MAX_PLAYERS], iNum, iPlayer;
 
 	get_players(iPlayers, iNum, "h");
+	g_iTopPlayersCount = iNum;
+	g_iPlayerTop = 0;
 	
 	// цикл сбора инфы по всем игрокам
 	for(new i; i < iNum; i++)
@@ -551,14 +621,25 @@ public CSGameRules_RestartRound_Post()
 	for(new i=0; i < iNum; i++)
 	{
 		iPlayer = g_arrData[i][PLAYER_ID];
-		if(!is_user_connected(iPlayer) || !IsPlayer(iPlayer))
-			return;
+		if(!is_user_connected(iPlayer) || !IsPlayer(iPlayer) || g_arrData[i][AWARD] <= 0)
+		{
+			// Награда не выдается невалидным/отключившимся игрокам.
+			continue;
+		}
 		rg_add_account(g_arrData[i][PLAYER_ID], g_arrData[i][AWARD], AS_ADD, true);
 	}
 }
 
 public ShowStats()
 {
+	if (g_iPlayerTop >= g_iTopPlayersCount || g_iPlayerTop >= sizeof(g_arrData))
+	{
+		remove_task(0);
+		g_iCounter = 0;
+		g_iPlayerTop = 0;
+		return;
+	}
+
 	new szName[MAX_NAME_LENGTH];
 	
 	get_user_name(g_arrData[g_iPlayerTop][PLAYER_ID], szName, charsmax(szName));
@@ -620,7 +701,7 @@ public ShowStats()
 		}
 		case 12:
 		{
-			ClearDHUDMessages;
+			ClearDHUDMessages();
 			g_iCounter++;
 		}
 		case 13..15:
@@ -631,8 +712,9 @@ public ShowStats()
 		}
 		case 16:
 		{
-			remove_task();
+			remove_task(0);
 			g_iCounter = 0;
+			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
 			DisableHookChain(g_hOnSpawnEquip);
 			
@@ -653,7 +735,7 @@ public ShowStats()
 			for (new i; i < ArraySize(g_aPlugins); i++)
 			unpause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 				
-			ClearDHUDMessages;
+			ClearDHUDMessages();
 			
 			set_cvar_num("sv_restart", 1);
 			set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
@@ -661,8 +743,9 @@ public ShowStats()
 		}
 		default:
 		{
-			remove_task();
+			remove_task(0);
 			g_iCounter = 0;
+			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
 			DisableHookChain(g_hOnSpawnEquip);
 			
@@ -683,7 +766,7 @@ public ShowStats()
 			for (new i; i < ArraySize(g_aPlugins); i++)
 			unpause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 				
-			ClearDHUDMessages;
+			ClearDHUDMessages();
 			
 			set_cvar_num("sv_restart", 1);
 			set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
