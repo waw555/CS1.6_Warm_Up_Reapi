@@ -10,6 +10,9 @@
 
 #define IsPlayer(%1)    (1 <= %1 && %1 <= g_iMaxPlayers)	//	Проверяем, что это игрок,  а не какой либо объект.
 #define ClearArr(%1)    arrayset(_:%1, _:0.0, sizeof(%1))	//	Очищаем массив
+#define MAX_ARTIST_NAME_LEN 50
+#define MAX_TRACK_NAME_LEN 50
+#define MAX_TRACK_TITLE_LEN (MAX_ARTIST_NAME_LEN + MAX_TRACK_NAME_LEN + 3)
 
 enum _:ePlayerData
 {
@@ -85,7 +88,7 @@ new Trie:g_tMusicDuration, Trie:g_tMusicTitle, Trie:g_tKnownMusicFiles;
 new HookChain:g_hCheckMapConditions, HookChain:g_hDropPlayerItem, HookChain:g_hOnSpawnEquip, HookChain:g_hKilled;
 
 new g_pDefaultCvars[sizeof(g_eCvarsToDisable)][64], g_pCvar[CVARS];
-new g_szWarmUpDescription[64], g_szWarmUpTrack[128], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", g_szWarmUpTimeMode[16] = "AUTO", Float:g_flMaxHealth, g_iCountDown, g_iSection, g_iTrackTime;
+new g_szWarmUpDescription[64], g_szWarmUpTrack[MAX_TRACK_TITLE_LEN + 1], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", g_szWarmUpTimeMode[16] = "AUTO", Float:g_flMaxHealth, g_iCountDown, g_iSection, g_iTrackTime;
 new g_szWarmUpConfigPath[PLATFORM_MAX_PATH];
 
 /* top 5*/
@@ -522,13 +525,13 @@ stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
 		{
 			if (aTag[0] == 'T' && aTag[1] == 'A' && aTag[2] == 'G')
 			{
-				new szArtist[64];
+				new szArtist[MAX_ARTIST_NAME_LEN + 1], szTitleRaw[MAX_TRACK_NAME_LEN + 1];
 				for (new i = 3, j; i < 33 && j < iTitleLen - 1; i++)
 				{
 					if (!aTag[i])
 						break;
-					szTrackTitle[j++] = aTag[i];
-					szTrackTitle[j] = '^0';
+					szTitleRaw[j++] = aTag[i];
+					szTitleRaw[j] = '^0';
 				}
 
 				for (new i = 33, j; i < 63 && j < charsmax(szArtist); i++)
@@ -539,11 +542,13 @@ stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
 					szArtist[j] = '^0';
 				}
 
-				trim(szTrackTitle);
+				trim(szTitleRaw);
 				trim(szArtist);
 
-				if (szArtist[0] && szTrackTitle[0])
-					formatex(szTrackTitle, iTitleLen, "%s - %s", szArtist, szTrackTitle);
+				if (szArtist[0] && szTitleRaw[0])
+					formatex(szTrackTitle, iTitleLen, "%s - %s", szArtist, szTitleRaw);
+				else if (szTitleRaw[0])
+					copy(szTrackTitle, iTitleLen, szTitleRaw);
 			}
 		}
 	}
@@ -552,6 +557,8 @@ stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
 
 	if (!szTrackTitle[0])
 		GetTrackName(szMusicPath, szTrackTitle, iTitleLen);
+
+	NormalizeTrackTitle(szTrackTitle, iTitleLen);
 }
 
 stock bool:GetFirstMp3Bitrate(File:hFile, &iBitrate)
@@ -628,7 +635,7 @@ stock RewriteMusicConfigSection()
 
 	for (new i; i < ArraySize(g_aMusicFilesOnDisk); i++)
 	{
-		new szMusicPath[MAX_RESOURCE_PATH_LENGTH], szTrackTitle[64], szNewEntry[256];
+		new szMusicPath[MAX_RESOURCE_PATH_LENGTH], szTrackTitle[MAX_TRACK_TITLE_LEN + 1], szNewEntry[320];
 		new iDuration;
 
 		ArrayGetString(g_aMusicFilesOnDisk, i, szMusicPath, charsmax(szMusicPath));
@@ -636,6 +643,8 @@ stock RewriteMusicConfigSection()
 		if (iDuration > 0)
 			iDuration = ClampWarmTime(iDuration);
 		TrieGetString(g_tMusicTitle, szMusicPath, szTrackTitle, charsmax(szTrackTitle));
+
+		NormalizeTrackTitle(szTrackTitle, charsmax(szTrackTitle));
 
 		if (!szTrackTitle[0])
 			copy(szTrackTitle, charsmax(szTrackTitle), "УКАЖИТЕ НАЗВАНИЕ ТРЕКА");
@@ -665,6 +674,44 @@ stock GetTrackName(const szPath[], szTrack[], iLen)
 	new iExt = containi(szTrack, ".mp3");
 	if (iExt != -1)
 		szTrack[iExt] = '^0';
+
+	NormalizeTrackTitle(szTrack, iLen);
+}
+
+stock NormalizeTrackTitle(szTrack[], iLen)
+{
+	trim(szTrack);
+
+	new iDelimiter = contain(szTrack, " - ");
+	if (iDelimiter != -1)
+	{
+		new szArtist[MAX_ARTIST_NAME_LEN + 1], szTitle[MAX_TRACK_NAME_LEN + 1];
+
+		copy(szArtist, charsmax(szArtist), szTrack);
+		new iArtistEnd = iDelimiter;
+		if (iArtistEnd > charsmax(szArtist))
+			iArtistEnd = charsmax(szArtist);
+		szArtist[iArtistEnd] = '^0';
+
+		copy(szTitle, charsmax(szTitle), szTrack[iDelimiter + 3]);
+
+		trim(szArtist);
+		trim(szTitle);
+
+		if (szArtist[0] && szTitle[0])
+			formatex(szTrack, iLen, "%s - %s", szArtist, szTitle);
+		else if (szTitle[0])
+			copy(szTrack, iLen, szTitle);
+		else
+			copy(szTrack, iLen, szArtist);
+
+		return;
+	}
+
+	new szTrimmed[MAX_TRACK_NAME_LEN + 1];
+	copy(szTrimmed, charsmax(szTrimmed), szTrack);
+	trim(szTrimmed);
+	copy(szTrack, iLen, szTrimmed);
 }
 
 stock ClampWarmTime(iTime)
@@ -802,7 +849,7 @@ public bool:values(INIParser:handle, const key[], const value[])
 			new iExists = 1;
 			TrieSetCell(g_tKnownMusicFiles, key, iExists);
 
-			new aMusicData[2][128];
+			new aMusicData[2][256];
 			if (explode_string(value, " | ", aMusicData, sizeof(aMusicData), charsmax(aMusicData[])) == 2)
 			{
 				trim(aMusicData[0]);
@@ -813,7 +860,10 @@ public bool:values(INIParser:handle, const key[], const value[])
 					TrieSetCell(g_tMusicDuration, key, ClampWarmTime(iDuration));
 
 				if (!equal(aMusicData[1], "УКАЖИТЕ НАЗВАНИЕ ТРЕКА") && aMusicData[1][0])
+				{
+					NormalizeTrackTitle(aMusicData[1], charsmax(aMusicData[]));
 					TrieSetString(g_tMusicTitle, key, aMusicData[1]);
+				}
 			}
 		}
 	}
