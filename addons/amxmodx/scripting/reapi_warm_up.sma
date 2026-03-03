@@ -83,7 +83,7 @@ new Array:g_aWarm, Array:g_aPlugins;
 new HookChain:g_hCheckMapConditions, HookChain:g_hDropPlayerItem, HookChain:g_hOnSpawnEquip, HookChain:g_hKilled;
 
 new g_pDefaultCvars[sizeof(g_eCvarsToDisable)][64], g_pCvar[CVARS];
-new g_szWarmUpDescription[64], g_szWarmUpTrack[128], Float:g_flMaxHealth, g_iCountDown, g_iSection, g_iTrackTime;
+new g_szWarmUpDescription[64], g_szWarmUpTrack[128], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", Float:g_flMaxHealth, g_iCountDown, g_iSection, g_iTrackTime;
 
 /* top 5*/
 new g_arrData[MAX_PLAYERS + 1][ePlayerData];
@@ -106,6 +106,8 @@ public plugin_precache()
 	
 	if (!ReadConfig())
 		set_fail_state("Something went wrong");
+
+	LoadWarmUpMusic();
 	
 	precache_sound("weapons/deagle-1.wav");
 	precache_sound("events/task_complete.wav");
@@ -185,6 +187,15 @@ public CSGameRules_CheckMapConditions()
 	
 	copy(g_szWarmUpDescription, charsmax(g_szWarmUpDescription), aWarm[DESCRIPTION]);
 	copy(g_szWarmUpTrack, charsmax(g_szWarmUpTrack), aWarm[TRACK]);
+
+	new bool:bRandomTrackPlayed = false;
+	if (g_szMapWarmUpMusic[0])
+	{
+		bRandomTrackPlayed = true;
+		GetTrackName(g_szMapWarmUpMusic, g_szWarmUpTrack, charsmax(g_szWarmUpTrack));
+		g_iTrackTime = g_iCountDown;
+		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^\"sound/%s^\"", g_szMapWarmUpMusic);
+	}
 	
 	// 
 	FillWeapons(aWarm[GUNS]);
@@ -196,9 +207,9 @@ public CSGameRules_CheckMapConditions()
 	for (new i; i < ArraySize(g_aPlugins); i++)
 		pause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 	
-	//
-	if (aWarm[MUSIC][0]) {
-		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^"sound/%s^"", aWarm[MUSIC]);
+	// Fallback: если папка с музыкой пуста, играем трек из конфигурации.
+	if (!bRandomTrackPlayed && aWarm[MUSIC][0]) {
+		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^\"sound/%s^\"", aWarm[MUSIC]);
 	}
 }
 
@@ -394,6 +405,57 @@ stock FillWeapons(szGun[])
 	TrieDestroy(tKnife);
 }
 
+
+stock LoadWarmUpMusic()
+{
+	g_szMapWarmUpMusic[0] = '^0';
+
+	new szFile[MAX_RESOURCE_PATH_LENGTH], FileType:iType;
+	new szFolderPath[MAX_RESOURCE_PATH_LENGTH];
+	formatex(szFolderPath, charsmax(szFolderPath), "sound/%s", g_szWarmUpMusicDir);
+
+	new Dir:hDir = open_dir(szFolderPath, szFile, charsmax(szFile), iType);
+
+	if (!hDir)
+		return;
+
+	new iFoundTracks;
+	do
+	{
+		if (iType != FileType_File)
+			continue;
+
+		if (containi(szFile, ".mp3") == -1)
+			continue;
+
+		iFoundTracks++;
+		if (random_num(1, iFoundTracks) == 1)
+			formatex(g_szMapWarmUpMusic, charsmax(g_szMapWarmUpMusic), "%s/%s", g_szWarmUpMusicDir, szFile);
+	}
+	while (next_file(hDir, szFile, charsmax(szFile), iType));
+
+	close_dir(hDir);
+
+	if (g_szMapWarmUpMusic[0])
+		precache_generic(fmt("sound/%s", g_szMapWarmUpMusic));
+}
+
+stock GetTrackName(const szPath[], szTrack[], iLen)
+{
+	new iLastSlash = -1;
+	for (new i; szPath[i] != '^0'; i++)
+	{
+		if (szPath[i] == '/')
+			iLastSlash = i;
+	}
+
+	copy(szTrack, iLen, szPath[(iLastSlash + 1)]);
+
+	new iExt = containi(szTrack, ".mp3");
+	if (iExt != -1)
+		szTrack[iExt] = '^0';
+}
+
 ReadConfig()
 {
 	new szPath[PLATFORM_MAX_PATH];
@@ -456,6 +518,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				g_pCvar[AUTO_AMMO] = str_to_num(value);
 			if (equal(key, "PAUSE_STATS"))
 				g_pCvar[PAUSE_STATS] = str_to_num(value);
+			if (equal(key, "MUSIC_FOLDER"))
+				copy(g_szWarmUpMusicDir, charsmax(g_szWarmUpMusicDir), value);
 		}
 		
 		case PLUGINS:
