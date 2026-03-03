@@ -8,7 +8,7 @@
 #define URL "None"
 #define DESCRIPTIONPLUGIN "Plugin for Warm Up"
 
-#define IsPlayer(%1)    (1 <= %1 <= g_iMaxPlayers)	//	Проверяем, что это игрок,  а не какой либо объект.
+#define IsPlayer(%1)    (1 <= %1 && %1 <= g_iMaxPlayers)	//	Проверяем, что это игрок,  а не какой либо объект.
 #define ClearArr(%1)    arrayset(_:%1, _:0.0, sizeof(%1))	//	Очищаем массив
 
 enum _:ePlayerData
@@ -95,6 +95,7 @@ new g_iCounter = 0;	//	Счетчик для тайминга отображен
 new g_iOriginal_sv_maxspeed = 320;	//	Скорость по умолчанию
 new cvar_name_sv_maxspeed;
 new g_iPlayerTop = 0;
+new g_iTopPlayersCount = 0;
 
 
 public plugin_precache()
@@ -120,10 +121,9 @@ public plugin_init()
 	DisableHookChain(g_hDropPlayerItem = RegisterHookChain(RG_CBasePlayer_DropPlayerItem, "CBasePlayer_DropPlayerItem", false));
 	DisableHookChain(g_hOnSpawnEquip = RegisterHookChain(RG_CBasePlayer_OnSpawnEquip, "CBasePlayer_OnSpawnEquip", true));
 	
-	/*top 5 */
+		/*top 5 */
 	RegisterHookChain(RG_CSGameRules_RestartRound, "CSGameRules_RestartRound_Post", true);
 	RegisterHookChain(RG_CBasePlayer_TakeDamage, "CBasePlayer_TakeDamage", true);
-	RegisterHookChain(RG_CBasePlayer_Killed, "CBasePlayer_Killed", true);
 	g_iMaxPlayers = get_member_game(m_nMaxPlayers);
 	cvar_name_sv_maxspeed = get_cvar_pointer( "sv_maxspeed" );
 	
@@ -233,7 +233,7 @@ public Show_Timer()
 {
 	if (--g_iCountDown == 0)
 	{
-		remove_task();
+		remove_task(0);
 		
 		g_iOriginal_sv_maxspeed = get_pcvar_num(cvar_name_sv_maxspeed);
 		log_amx("g_fOriginal_sv_maxspeed = %f", g_iOriginal_sv_maxspeed);
@@ -300,6 +300,10 @@ stock FillWeapons(szGun[])
 		szSecondaryWeapon[128],
 		szGrenade[64],
 		szWeapon[11];
+
+	szPrimaryWeapon[0] = '^0';
+	szSecondaryWeapon[0] = '^0';
+	szGrenade[0] = '^0';
 	
 	new bool:bKnife = false;
 	new value;
@@ -515,6 +519,8 @@ public fnCompareDamage()
 	new iPlayers[MAX_PLAYERS], iNum, iPlayer;
 
 	get_players(iPlayers, iNum, "h");
+	g_iTopPlayersCount = iNum;
+	g_iPlayerTop = 0;
 	
 	// цикл сбора инфы по всем игрокам
 	for(new i; i < iNum; i++)
@@ -551,14 +557,25 @@ public CSGameRules_RestartRound_Post()
 	for(new i=0; i < iNum; i++)
 	{
 		iPlayer = g_arrData[i][PLAYER_ID];
-		if(!is_user_connected(iPlayer) || !IsPlayer(iPlayer))
-			return;
+		if(!is_user_connected(iPlayer) || !IsPlayer(iPlayer) || g_arrData[i][AWARD] <= 0)
+		{
+			// Награда не выдается невалидным/отключившимся игрокам.
+			continue;
+		}
 		rg_add_account(g_arrData[i][PLAYER_ID], g_arrData[i][AWARD], AS_ADD, true);
 	}
 }
 
 public ShowStats()
 {
+	if (g_iPlayerTop >= g_iTopPlayersCount || g_iPlayerTop >= sizeof(g_arrData))
+	{
+		remove_task(0);
+		g_iCounter = 0;
+		g_iPlayerTop = 0;
+		return;
+	}
+
 	new szName[MAX_NAME_LENGTH];
 	
 	get_user_name(g_arrData[g_iPlayerTop][PLAYER_ID], szName, charsmax(szName));
@@ -620,7 +637,7 @@ public ShowStats()
 		}
 		case 12:
 		{
-			ClearDHUDMessages;
+			ClearDHUDMessages();
 			g_iCounter++;
 		}
 		case 13..15:
@@ -631,8 +648,9 @@ public ShowStats()
 		}
 		case 16:
 		{
-			remove_task();
+			remove_task(0);
 			g_iCounter = 0;
+			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
 			DisableHookChain(g_hOnSpawnEquip);
 			
@@ -653,7 +671,7 @@ public ShowStats()
 			for (new i; i < ArraySize(g_aPlugins); i++)
 			unpause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 				
-			ClearDHUDMessages;
+			ClearDHUDMessages();
 			
 			set_cvar_num("sv_restart", 1);
 			set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
@@ -661,8 +679,9 @@ public ShowStats()
 		}
 		default:
 		{
-			remove_task();
+			remove_task(0);
 			g_iCounter = 0;
+			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
 			DisableHookChain(g_hOnSpawnEquip);
 			
@@ -683,7 +702,7 @@ public ShowStats()
 			for (new i; i < ArraySize(g_aPlugins); i++)
 			unpause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 				
-			ClearDHUDMessages;
+			ClearDHUDMessages();
 			
 			set_cvar_num("sv_restart", 1);
 			set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
