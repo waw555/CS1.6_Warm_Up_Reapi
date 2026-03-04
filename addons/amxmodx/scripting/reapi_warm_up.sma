@@ -229,7 +229,7 @@ public CSGameRules_CheckMapConditions()
 			g_szWarmUpTrack[0] = '^0';
 		}
 
-		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^\"sound/%s^\"", g_szMapWarmUpMusic);
+		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^"sound/%s^"", g_szMapWarmUpMusic);
 	}
 	
 	// 
@@ -244,7 +244,7 @@ public CSGameRules_CheckMapConditions()
 	
 	// Fallback: если папка с музыкой пуста, играем трек из конфигурации.
 	if (!bRandomTrackPlayed && aWarm[MUSIC][0]) {
-		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^\"sound/%s^\"", aWarm[MUSIC]);
+		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^"sound/%s^"", aWarm[MUSIC]);
 	}
 }
 
