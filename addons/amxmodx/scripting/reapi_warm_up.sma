@@ -354,7 +354,7 @@ stock HighlightWarmupLeader()
 	vecRingTop[2] = vecOrigin[2];
 	vecRingTop[2] += 170.0 + (float(g_iCountDown & 1) * 35.0);
 
-	message_begin(MSG_PVS, SVC_TEMPENTITY, vecOrigin, 0);
+	message_begin(MSG_ALL, SVC_TEMPENTITY);
 	write_byte(TE_BEAMCYLINDER);
 	engfunc(EngFunc_WriteCoord, vecOrigin[0]);
 	engfunc(EngFunc_WriteCoord, vecOrigin[1]);
@@ -375,7 +375,7 @@ stock HighlightWarmupLeader()
 	write_byte(0);
 	message_end();
 
-	message_begin(MSG_PVS, SVC_TEMPENTITY, vecOrigin, 0);
+	message_begin(MSG_ALL, SVC_TEMPENTITY);
 	write_byte(TE_BEAMPOINTS);
 	engfunc(EngFunc_WriteCoord, vecHead[0]);
 	engfunc(EngFunc_WriteCoord, vecHead[1]);
@@ -538,7 +538,7 @@ stock LoadWarmUpMusic()
 	new szFolderPath[MAX_RESOURCE_PATH_LENGTH];
 	formatex(szFolderPath, charsmax(szFolderPath), "sound/%s", g_szWarmUpMusicDir);
 
-	new Dir:hDir = open_dir(szFolderPath, szFile, charsmax(szFile), iType);
+	new hDir = open_dir(szFolderPath, szFile, charsmax(szFile), iType);
 
 	if (!hDir)
 		return;
@@ -594,7 +594,7 @@ stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
 	new szFullPath[PLATFORM_MAX_PATH];
 	formatex(szFullPath, charsmax(szFullPath), "sound/%s", szMusicPath);
 
-	new File:hFile = fopen(szFullPath, "rb");
+	new hFile = fopen(szFullPath, "rb");
 	if (!hFile)
 		return;
 
@@ -655,7 +655,7 @@ stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
 	NormalizeTrackTitle(szTrackTitle, iTitleLen);
 }
 
-stock bool:GetFirstMp3Bitrate(File:hFile, &iBitrate)
+stock bool:GetFirstMp3Bitrate(hFile, &iBitrate)
 {
 	iBitrate = 0;
 	fseek(hFile, 0, SEEK_SET);
