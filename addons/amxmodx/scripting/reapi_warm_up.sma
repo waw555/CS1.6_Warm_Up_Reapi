@@ -14,6 +14,9 @@
 #define MAX_TRACK_NAME_LEN 50
 #define MAX_TRACK_TITLE_LEN (MAX_ARTIST_NAME_LEN + MAX_TRACK_NAME_LEN + 3)
 
+#define TE_BEAMPOINTS 0
+#define TE_BEAMCYLINDER 21
+
 enum _:ePlayerData
 {
 	PLAYER_ID,
@@ -102,6 +105,7 @@ new g_iOriginal_sv_maxspeed = 320;	//	Скорость по умолчанию
 new cvar_name_sv_maxspeed;
 new g_iPlayerTop = 0;
 new g_iTopPlayersCount = 0;
+new g_iBeamSprite, g_iRingSprite;
 
 
 public plugin_precache()
@@ -121,6 +125,8 @@ public plugin_precache()
 	
 	precache_sound("weapons/deagle-1.wav");
 	precache_sound("events/task_complete.wav");
+	g_iBeamSprite = precache_model("sprites/laserbeam.spr");
+	g_iRingSprite = precache_model("sprites/shockwave.spr");
 }
 
 public plugin_init()
@@ -223,7 +229,7 @@ public CSGameRules_CheckMapConditions()
 			g_szWarmUpTrack[0] = '^0';
 		}
 
-		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^\"sound/%s^\"", g_szMapWarmUpMusic);
+		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^"sound/%s^"", g_szMapWarmUpMusic);
 	}
 	
 	// 
@@ -238,7 +244,7 @@ public CSGameRules_CheckMapConditions()
 	
 	// Fallback: если папка с музыкой пуста, играем трек из конфигурации.
 	if (!bRandomTrackPlayed && aWarm[MUSIC][0]) {
-		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^\"sound/%s^\"", aWarm[MUSIC]);
+		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^"sound/%s^"", aWarm[MUSIC]);
 	}
 }
 
@@ -319,7 +325,95 @@ public Show_Timer()
 			set_dhudmessage( .red = 0, .green = 255, .blue = 0, .x = -1.0, .y = 0.07, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
 			show_dhudmessage(0, "РАЗМИНКА ЗАКОНЧИТСЯ ЧЕРЕЗ %i СЕК", g_iCountDown);
 		}
+
+		HighlightWarmupLeader();
 	}
+}
+
+stock HighlightWarmupLeader()
+{
+	new iLeader = GetWarmupLeaderByDamage();
+	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
+		return;
+
+	new Float:vecOrigin[3], Float:vecHead[3], Float:vecBeamTop[3], Float:vecRingTop[3];
+	get_entvar(iLeader, var_origin, vecOrigin);
+
+	vecHead[0] = vecOrigin[0];
+	vecHead[1] = vecOrigin[1];
+	vecHead[2] = vecOrigin[2];
+	vecHead[2] += 30.0;
+
+	vecBeamTop[0] = vecHead[0];
+	vecBeamTop[1] = vecHead[1];
+	vecBeamTop[2] = vecHead[2];
+	vecBeamTop[2] += 220.0;
+
+	vecRingTop[0] = vecOrigin[0];
+	vecRingTop[1] = vecOrigin[1];
+	vecRingTop[2] = vecOrigin[2];
+	vecRingTop[2] += 170.0 + (float(g_iCountDown & 1) * 35.0);
+
+	message_begin(MSG_PVS, SVC_TEMPENTITY, vecOrigin, 0);
+	write_byte(TE_BEAMCYLINDER);
+	engfunc(EngFunc_WriteCoord, vecOrigin[0]);
+	engfunc(EngFunc_WriteCoord, vecOrigin[1]);
+	engfunc(EngFunc_WriteCoord, vecOrigin[2] + 5.0);
+	engfunc(EngFunc_WriteCoord, vecRingTop[0]);
+	engfunc(EngFunc_WriteCoord, vecRingTop[1]);
+	engfunc(EngFunc_WriteCoord, vecRingTop[2]);
+	write_short(g_iRingSprite);
+	write_byte(0);
+	write_byte(0);
+	write_byte(8);
+	write_byte(20);
+	write_byte(0);
+	write_byte(255);
+	write_byte(0);
+	write_byte(0);
+	write_byte(200);
+	write_byte(0);
+	message_end();
+
+	message_begin(MSG_PVS, SVC_TEMPENTITY, vecOrigin, 0);
+	write_byte(TE_BEAMPOINTS);
+	engfunc(EngFunc_WriteCoord, vecHead[0]);
+	engfunc(EngFunc_WriteCoord, vecHead[1]);
+	engfunc(EngFunc_WriteCoord, vecHead[2]);
+	engfunc(EngFunc_WriteCoord, vecBeamTop[0]);
+	engfunc(EngFunc_WriteCoord, vecBeamTop[1]);
+	engfunc(EngFunc_WriteCoord, vecBeamTop[2]);
+	write_short(g_iBeamSprite);
+	write_byte(0);
+	write_byte(0);
+	write_byte(6);
+	write_byte(20);
+	write_byte(0);
+	write_byte(255);
+	write_byte(0);
+	write_byte(0);
+	write_byte(210);
+	write_byte(0);
+	message_end();
+}
+
+stock GetWarmupLeaderByDamage()
+{
+	new iLeader, iMaxDamage = -1;
+
+	for (new id = 1; id <= g_iMaxPlayers; id++)
+	{
+		if (!is_user_connected(id) || !is_user_alive(id))
+			continue;
+
+		if (g_iPlayerDmg[id] > iMaxDamage)
+		{
+			iMaxDamage = g_iPlayerDmg[id];
+			iLeader = id;
+		}
+	}
+
+	return iLeader;
 }
 
 @restart() 
