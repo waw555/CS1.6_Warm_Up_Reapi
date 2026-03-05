@@ -107,6 +107,8 @@ new cvar_name_sv_maxspeed;
 new g_iPlayerTop = 0;
 new g_iTopPlayersCount = 0;
 new g_iBeamSprite, g_iRingSprite;
+new bool:g_bFirstKillHappened;
+new g_iWarmupLeader;
 
 
 public plugin_precache()
@@ -238,7 +240,9 @@ public CSGameRules_CheckMapConditions()
 	
 	//
 	set_task(1.0, "Show_Timer", .flags = "b");
-	set_task(0.2, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
+	set_task(5.0, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
+	g_bFirstKillHappened = false;
+	g_iWarmupLeader = 0;
 	
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
@@ -269,6 +273,8 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 		return;
 	
 	g_iPlayerKills[Attacker]++;
+	g_bFirstKillHappened = true;
+	g_iWarmupLeader = GetWarmupLeaderByStats();
 
 	new pWeapon = get_member(Attacker, m_pActiveItem);
 	if (is_nullent(pWeapon) || ~CSW_ALL_GUNS & 1 << get_member(pWeapon, m_iId))
@@ -333,14 +339,22 @@ public Show_Timer()
 
 public Task_HighlightWarmupLeader()
 {
+	if (!g_bFirstKillHappened)
+		return;
+
 	HighlightWarmupLeader();
 }
 
 stock HighlightWarmupLeader()
 {
-	new iLeader = GetWarmupLeaderByStats();
+	new iLeader = g_iWarmupLeader;
+	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
+		iLeader = GetWarmupLeaderByStats();
+
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
 		return;
+
+	g_iWarmupLeader = iLeader;
 
 	new Float:vecOrigin[3], Float:vecHead[3], Float:vecBeamTop[3], Float:vecRingTop[3];
 	get_entvar(iLeader, var_origin, vecOrigin);
@@ -1070,6 +1084,8 @@ public ShowStats()
 	{
 		remove_task(0);
 		remove_task(TASK_HIGHLIGHT_LEADER);
+		g_bFirstKillHappened = false;
+		g_iWarmupLeader = 0;
 		g_iCounter = 0;
 		g_iPlayerTop = 0;
 		return;
@@ -1149,6 +1165,8 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
+			g_bFirstKillHappened = false;
+			g_iWarmupLeader = 0;
 			g_iCounter = 0;
 			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
@@ -1181,6 +1199,8 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
+			g_bFirstKillHappened = false;
+			g_iWarmupLeader = 0;
 			g_iCounter = 0;
 			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
