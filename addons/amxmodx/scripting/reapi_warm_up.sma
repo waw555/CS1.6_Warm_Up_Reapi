@@ -16,6 +16,7 @@
 
 #define TE_BEAMPOINTS 0
 #define TE_BEAMCYLINDER 21
+#define TASK_HIGHLIGHT_LEADER 31415
 
 enum _:ePlayerData
 {
@@ -237,6 +238,7 @@ public CSGameRules_CheckMapConditions()
 	
 	//
 	set_task(1.0, "Show_Timer", .flags = "b");
+	set_task(0.2, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
 	
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
@@ -326,13 +328,17 @@ public Show_Timer()
 			show_dhudmessage(0, "РАЗМИНКА ЗАКОНЧИТСЯ ЧЕРЕЗ %i СЕК", g_iCountDown);
 		}
 
-		HighlightWarmupLeader();
 	}
+}
+
+public Task_HighlightWarmupLeader()
+{
+	HighlightWarmupLeader();
 }
 
 stock HighlightWarmupLeader()
 {
-	new iLeader = GetWarmupLeaderByDamage();
+	new iLeader = GetWarmupLeaderByStats();
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
 		return;
 
@@ -397,18 +403,19 @@ stock HighlightWarmupLeader()
 	message_end();
 }
 
-stock GetWarmupLeaderByDamage()
+stock GetWarmupLeaderByStats()
 {
-	new iLeader, iMaxDamage = -1;
+	new iLeader, iMaxDamage = -1, iMaxKills = -1;
 
 	for (new id = 1; id <= g_iMaxPlayers; id++)
 	{
 		if (!is_user_connected(id) || !is_user_alive(id))
 			continue;
 
-		if (g_iPlayerDmg[id] > iMaxDamage)
+		if (g_iPlayerDmg[id] > iMaxDamage || (g_iPlayerDmg[id] == iMaxDamage && g_iPlayerKills[id] > iMaxKills))
 		{
 			iMaxDamage = g_iPlayerDmg[id];
+			iMaxKills = g_iPlayerKills[id];
 			iLeader = id;
 		}
 	}
@@ -556,11 +563,13 @@ stock LoadWarmUpMusic()
 		formatex(szMusicPath, charsmax(szMusicPath), "%s/%s", g_szWarmUpMusicDir, szFile);
 		ArrayPushString(g_aMusicFilesOnDisk, szMusicPath);
 
-		new iExists;
-		if (!TrieGetCell(g_tKnownMusicFiles, szMusicPath, iExists))
+		new iExists, iTrackDuration;
+		new szTrackTitle[64];
+		new bool:bHasDuration = TrieGetCell(g_tMusicDuration, szMusicPath, iTrackDuration) && iTrackDuration > 0;
+		new bool:bHasTitle = TrieGetString(g_tMusicTitle, szMusicPath, szTrackTitle, charsmax(szTrackTitle)) && szTrackTitle[0];
+
+		if (!TrieGetCell(g_tKnownMusicFiles, szMusicPath, iExists) || !bHasDuration || !bHasTitle)
 		{
-			new iTrackDuration;
-			new szTrackTitle[64];
 			ReadMp3Meta(szMusicPath, iTrackDuration, szTrackTitle, charsmax(szTrackTitle));
 
 			if (iTrackDuration > 0)
@@ -638,6 +647,12 @@ stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
 
 				trim(szTitleRaw);
 				trim(szArtist);
+
+				if (!IsLikelyReadableTitle(szArtist) || !IsLikelyReadableTitle(szTitleRaw))
+				{
+					szArtist[0] = '^0';
+					szTitleRaw[0] = '^0';
+				}
 
 				if (szArtist[0] && szTitleRaw[0])
 					formatex(szTrackTitle, iTitleLen, "%s - %s", szArtist, szTitleRaw);
@@ -808,6 +823,18 @@ stock NormalizeTrackTitle(szTrack[], iLen)
 	copy(szTrack, iLen, szTrimmed);
 }
 
+
+stock bool:IsLikelyReadableTitle(const szText[])
+{
+	for (new i; szText[i] != '^0'; i++)
+	{
+		if (szText[i] < 32 || szText[i] > 126)
+			return false;
+	}
+
+	return true;
+}
+
 stock ClampWarmTime(iTime)
 {
 	if (iTime < 10)
@@ -940,9 +967,6 @@ public bool:values(INIParser:handle, const key[], const value[])
 
 		case MUSIC_FILES:
 		{
-			new iExists = 1;
-			TrieSetCell(g_tKnownMusicFiles, key, iExists);
-
 			new aMusicData[2][256];
 			if (explode_string(value, " | ", aMusicData, sizeof(aMusicData), charsmax(aMusicData[])) == 2)
 			{
@@ -958,6 +982,9 @@ public bool:values(INIParser:handle, const key[], const value[])
 					NormalizeTrackTitle(aMusicData[1], charsmax(aMusicData[]));
 					TrieSetString(g_tMusicTitle, key, aMusicData[1]);
 				}
+
+				if (iDuration > 0 && !equal(aMusicData[1], "УКАЖИТЕ НАЗВАНИЕ ТРЕКА") && aMusicData[1][0])
+					TrieSetCell(g_tKnownMusicFiles, key, 1);
 			}
 		}
 	}
@@ -1042,6 +1069,7 @@ public ShowStats()
 	if (g_iPlayerTop >= g_iTopPlayersCount || g_iPlayerTop >= sizeof(g_arrData))
 	{
 		remove_task(0);
+		remove_task(TASK_HIGHLIGHT_LEADER);
 		g_iCounter = 0;
 		g_iPlayerTop = 0;
 		return;
@@ -1120,6 +1148,7 @@ public ShowStats()
 		case 16:
 		{
 			remove_task(0);
+			remove_task(TASK_HIGHLIGHT_LEADER);
 			g_iCounter = 0;
 			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
@@ -1151,6 +1180,7 @@ public ShowStats()
 		default:
 		{
 			remove_task(0);
+			remove_task(TASK_HIGHLIGHT_LEADER);
 			g_iCounter = 0;
 			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
