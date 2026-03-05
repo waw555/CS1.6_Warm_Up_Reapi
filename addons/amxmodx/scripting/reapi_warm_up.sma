@@ -394,7 +394,9 @@ stock GetWarmupLeaderByStats()
 		if (!is_user_connected(id) || !is_user_alive(id))
 			continue;
 
-		if (g_iPlayerDmg[id] > iMaxDamage || (g_iPlayerDmg[id] == iMaxDamage && g_iPlayerKills[id] > iMaxKills))
+		if (g_iPlayerKills[id] > iMaxKills
+		|| (g_iPlayerKills[id] == iMaxKills && g_iPlayerDmg[id] > iMaxDamage)
+		|| (g_iPlayerKills[id] == iMaxKills && g_iPlayerDmg[id] == iMaxDamage && (!iLeader || id < iLeader)))
 		{
 			iMaxDamage = g_iPlayerDmg[id];
 			iMaxKills = g_iPlayerKills[id];
@@ -1002,7 +1004,12 @@ public CBasePlayer_TakeDamage(const pevVictim, pevInflictor, const pevAttacker, 
 		return HC_CONTINUE;
 	
 	if(rg_is_player_can_takedamage(pevVictim, pevAttacker))
+	{
 		g_iPlayerDmg[pevAttacker] += floatround(flDamage);
+
+		if (g_bFirstKillHappened)
+			g_iWarmupLeader = GetWarmupLeaderByStats();
+	}
 	
 	return HC_CONTINUE;
 }
