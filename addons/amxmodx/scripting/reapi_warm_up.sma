@@ -109,7 +109,9 @@ new g_iTopPlayersCount = 0;
 new g_iRingSprite;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
+#if defined SetPlayerChatBubble
 new g_iLastBubbleLeader;
+#endif
 new bool:g_bHighlightEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new g_iHighlightColor[3] = {255, 0, 0};
@@ -242,7 +244,7 @@ public CSGameRules_CheckMapConditions()
 	}
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
-	g_iLastBubbleLeader = 0;
+	ResetWarmupLeaderBubble();
 	
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
@@ -400,6 +402,13 @@ stock ShowWarmupLeaderBubble(iLeader)
 	g_iLastBubbleLeader = iLeader;
 #else
 	#pragma unused iLeader
+#endif
+}
+
+stock ResetWarmupLeaderBubble()
+{
+#if defined SetPlayerChatBubble
+	g_iLastBubbleLeader = 0;
 #endif
 }
 
@@ -1092,7 +1101,7 @@ public ShowStats()
 		remove_task(TASK_HIGHLIGHT_LEADER);
 		g_bFirstKillHappened = false;
 		g_iWarmupLeader = 0;
-		g_iLastBubbleLeader = 0;
+		ResetWarmupLeaderBubble();
 		g_iCounter = 0;
 		g_iPlayerTop = 0;
 		return;
@@ -1174,7 +1183,7 @@ public ShowStats()
 			remove_task(TASK_HIGHLIGHT_LEADER);
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
-			g_iLastBubbleLeader = 0;
+			ResetWarmupLeaderBubble();
 			g_iCounter = 0;
 			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
@@ -1209,7 +1218,7 @@ public ShowStats()
 			remove_task(TASK_HIGHLIGHT_LEADER);
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
-			g_iLastBubbleLeader = 0;
+			ResetWarmupLeaderBubble();
 			g_iCounter = 0;
 			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
