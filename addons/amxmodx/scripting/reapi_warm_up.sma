@@ -398,7 +398,8 @@ stock ShowWarmupLeaderBubble(iLeader)
 	if (IsPlayer(g_iLastBubbleLeader) && g_iLastBubbleLeader != iLeader)
 		SetPlayerChatBubble(g_iLastBubbleLeader, "", 0, 0, 0, 0.1);
 
-	SetPlayerChatBubble(iLeader, "Лидер", g_iHighlightColor[0], g_iHighlightColor[1], g_iHighlightColor[2], g_flHighlightInterval + 0.1);
+	// Chat-bubble reliably renders ASCII only on many CS 1.6 clients.
+	SetPlayerChatBubble(iLeader, "LEADER", g_iHighlightColor[0], g_iHighlightColor[1], g_iHighlightColor[2], g_flHighlightInterval + 0.1);
 	g_iLastBubbleLeader = iLeader;
 #else
 	#pragma unused iLeader
