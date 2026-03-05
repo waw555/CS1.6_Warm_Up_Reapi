@@ -19,8 +19,6 @@ new const WARMUP_CONFIG_FILE[] = "configs/plugins/warm_up.ini"; // Путь к �
 #define TE_BEAMCYLINDER 21
 #define TASK_HIGHLIGHT_LEADER 31415
 
-native Attach3DTextLabelToPlayer(id, const szText[]);
-
 enum _:ePlayerData
 {
 	PLAYER_ID,
@@ -111,7 +109,6 @@ new g_iTopPlayersCount = 0;
 new g_iRingSprite;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
-new g_iLeaderLabelPlayer;
 new bool:g_bHighlightEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new g_iHighlightColor[3] = {255, 0, 0};
@@ -244,8 +241,6 @@ public CSGameRules_CheckMapConditions()
 	}
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
-	g_iLeaderLabelPlayer = 0;
-	UpdateWarmupLeaderLabel(0);
 	
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
@@ -291,7 +286,6 @@ public Show_Timer()
 	if (--g_iCountDown == 0)
 	{
 		remove_task(0);
-		UpdateWarmupLeaderLabel(0);
 		
 		g_iOriginal_sv_maxspeed = get_pcvar_num(cvar_name_sv_maxspeed);
 		log_amx("g_fOriginal_sv_maxspeed = %f", g_iOriginal_sv_maxspeed);
@@ -360,12 +354,10 @@ stock HighlightWarmupLeader()
 
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
 	{
-		UpdateWarmupLeaderLabel(0);
 		return;
 	}
 
 	g_iWarmupLeader = iLeader;
-	UpdateWarmupLeaderLabel(iLeader);
 
 	new Float:vecOrigin[3], Float:vecRingTop[3];
 	get_entvar(iLeader, var_origin, vecOrigin);
@@ -424,27 +416,6 @@ stock GetWarmupLeaderByStats()
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
 	client_cmd(0, "stopsound; mp3 stop");
 	set_cvar_num("sv_restart", 1);
-}
-
-public client_disconnected(id)
-{
-	if (id == g_iLeaderLabelPlayer)
-		UpdateWarmupLeaderLabel(0);
-}
-
-stock UpdateWarmupLeaderLabel(iLeader)
-{
-	if (IsPlayer(g_iLeaderLabelPlayer) && is_user_connected(g_iLeaderLabelPlayer) && g_iLeaderLabelPlayer != iLeader)
-		Attach3DTextLabelToPlayer(g_iLeaderLabelPlayer, "");
-
-	if (IsPlayer(iLeader) && is_user_connected(iLeader))
-	{
-		Attach3DTextLabelToPlayer(iLeader, "ЛИДЕР");
-		g_iLeaderLabelPlayer = iLeader;
-		return;
-	}
-
-	g_iLeaderLabelPlayer = 0;
 }
 
 stock FillWeapons(szGun[])
