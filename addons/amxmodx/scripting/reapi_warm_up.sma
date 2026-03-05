@@ -109,9 +109,6 @@ new g_iTopPlayersCount = 0;
 new g_iRingSprite;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
-#if defined SetPlayerChatBubble
-new g_iLastBubbleLeader;
-#endif
 new bool:g_bHighlightEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new g_iHighlightColor[3] = {255, 0, 0};
@@ -244,7 +241,6 @@ public CSGameRules_CheckMapConditions()
 	}
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
-	ResetWarmupLeaderBubble();
 	
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
@@ -360,7 +356,6 @@ stock HighlightWarmupLeader()
 		return;
 
 	g_iWarmupLeader = iLeader;
-	ShowWarmupLeaderBubble(iLeader);
 
 	new Float:vecOrigin[3], Float:vecRingTop[3];
 	get_entvar(iLeader, var_origin, vecOrigin);
@@ -390,27 +385,6 @@ stock HighlightWarmupLeader()
 	write_byte(200);
 	write_byte(0);
 	message_end();
-}
-
-stock ShowWarmupLeaderBubble(iLeader)
-{
-#if defined SetPlayerChatBubble
-	if (IsPlayer(g_iLastBubbleLeader) && g_iLastBubbleLeader != iLeader)
-		SetPlayerChatBubble(g_iLastBubbleLeader, "", 0, 0, 0, 0.1);
-
-	// Chat-bubble reliably renders ASCII only on many CS 1.6 clients.
-	SetPlayerChatBubble(iLeader, "LEADER", g_iHighlightColor[0], g_iHighlightColor[1], g_iHighlightColor[2], g_flHighlightInterval + 0.1);
-	g_iLastBubbleLeader = iLeader;
-#else
-	#pragma unused iLeader
-#endif
-}
-
-stock ResetWarmupLeaderBubble()
-{
-#if defined SetPlayerChatBubble
-	g_iLastBubbleLeader = 0;
-#endif
 }
 
 stock GetWarmupLeaderByStats()
@@ -1102,7 +1076,6 @@ public ShowStats()
 		remove_task(TASK_HIGHLIGHT_LEADER);
 		g_bFirstKillHappened = false;
 		g_iWarmupLeader = 0;
-		ResetWarmupLeaderBubble();
 		g_iCounter = 0;
 		g_iPlayerTop = 0;
 		return;
@@ -1184,7 +1157,6 @@ public ShowStats()
 			remove_task(TASK_HIGHLIGHT_LEADER);
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
-			ResetWarmupLeaderBubble();
 			g_iCounter = 0;
 			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
@@ -1219,7 +1191,6 @@ public ShowStats()
 			remove_task(TASK_HIGHLIGHT_LEADER);
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
-			ResetWarmupLeaderBubble();
 			g_iCounter = 0;
 			g_iPlayerTop = 0;
 			DisableHookChain(g_hDropPlayerItem);
