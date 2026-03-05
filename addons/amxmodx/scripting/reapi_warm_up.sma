@@ -14,7 +14,6 @@
 #define MAX_TRACK_NAME_LEN 50
 #define MAX_TRACK_TITLE_LEN (MAX_ARTIST_NAME_LEN + MAX_TRACK_NAME_LEN + 3)
 
-#define TE_BEAMPOINTS 0
 #define TE_BEAMCYLINDER 21
 #define TASK_HIGHLIGHT_LEADER 31415
 
@@ -105,9 +104,12 @@ new g_iOriginal_sv_maxspeed = 320;	//	Скорость по умолчанию
 new cvar_name_sv_maxspeed;
 new g_iPlayerTop = 0;
 new g_iTopPlayersCount = 0;
-new g_iBeamSprite, g_iRingSprite;
+new g_iRingSprite;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
+new bool:g_bHighlightEnabled = true;
+new Float:g_flHighlightInterval = 5.0;
+new g_iHighlightColor[3] = {255, 0, 0};
 
 
 public plugin_precache()
@@ -127,7 +129,6 @@ public plugin_precache()
 	
 	precache_sound("weapons/deagle-1.wav");
 	precache_sound("events/task_complete.wav");
-	g_iBeamSprite = precache_model("sprites/laserbeam.spr");
 	g_iRingSprite = precache_model("sprites/shockwave.spr");
 }
 
@@ -226,7 +227,8 @@ public CSGameRules_CheckMapConditions()
 	
 	//
 	set_task(1.0, "Show_Timer", .flags = "b");
-	set_task(5.0, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
+	if (g_bHighlightEnabled)
+		set_task(g_flHighlightInterval, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
 	
@@ -344,18 +346,8 @@ stock HighlightWarmupLeader()
 
 	g_iWarmupLeader = iLeader;
 
-	new Float:vecOrigin[3], Float:vecHead[3], Float:vecBeamTop[3], Float:vecRingTop[3];
+	new Float:vecOrigin[3], Float:vecRingTop[3];
 	get_entvar(iLeader, var_origin, vecOrigin);
-
-	vecHead[0] = vecOrigin[0];
-	vecHead[1] = vecOrigin[1];
-	vecHead[2] = vecOrigin[2];
-	vecHead[2] += 30.0;
-
-	vecBeamTop[0] = vecHead[0];
-	vecBeamTop[1] = vecHead[1];
-	vecBeamTop[2] = vecHead[2];
-	vecBeamTop[2] += 220.0;
 
 	vecRingTop[0] = vecOrigin[0];
 	vecRingTop[1] = vecOrigin[1];
@@ -376,31 +368,10 @@ stock HighlightWarmupLeader()
 	write_byte(8);
 	write_byte(20);
 	write_byte(0);
-	write_byte(255);
-	write_byte(0);
-	write_byte(0);
+	write_byte(g_iHighlightColor[0]);
+	write_byte(g_iHighlightColor[1]);
+	write_byte(g_iHighlightColor[2]);
 	write_byte(200);
-	write_byte(0);
-	message_end();
-
-	message_begin(MSG_ALL, SVC_TEMPENTITY);
-	write_byte(TE_BEAMPOINTS);
-	engfunc(EngFunc_WriteCoord, vecHead[0]);
-	engfunc(EngFunc_WriteCoord, vecHead[1]);
-	engfunc(EngFunc_WriteCoord, vecHead[2]);
-	engfunc(EngFunc_WriteCoord, vecBeamTop[0]);
-	engfunc(EngFunc_WriteCoord, vecBeamTop[1]);
-	engfunc(EngFunc_WriteCoord, vecBeamTop[2]);
-	write_short(g_iBeamSprite);
-	write_byte(0);
-	write_byte(0);
-	write_byte(6);
-	write_byte(20);
-	write_byte(0);
-	write_byte(255);
-	write_byte(0);
-	write_byte(0);
-	write_byte(210);
 	write_byte(0);
 	message_end();
 }
@@ -909,6 +880,12 @@ public bool:values(INIParser:handle, const key[], const value[])
 				copy(g_szWarmUpMusicDir, charsmax(g_szWarmUpMusicDir), value);
 			if (equal(key, "WARMUP_TIME"))
 				copy(g_szWarmUpTimeMode, charsmax(g_szWarmUpTimeMode), value);
+			if (equal(key, "HIGHLIGHT_ENABLED"))
+				g_bHighlightEnabled = bool:clamp(str_to_num(value), 0, 1);
+			if (equal(key, "HIGHLIGHT_INTERVAL"))
+				g_flHighlightInterval = floatclamp(str_to_float(value), 0.1, 5.0);
+			if (equal(key, "HIGHLIGHT_COLOR"))
+				ParseHighlightColor(value);
 		}
 		
 		case PLUGINS:
@@ -970,6 +947,16 @@ public bool:values(INIParser:handle, const key[], const value[])
 	}
 	
 	return true;
+}
+
+stock ParseHighlightColor(const szValue[])
+{
+	new szColor[3][12];
+	if (explode_string(szValue, " ", szColor, sizeof(szColor), charsmax(szColor[])) < 3)
+		return;
+
+	for (new i; i < sizeof(g_iHighlightColor); i++)
+		g_iHighlightColor[i] = clamp(str_to_num(szColor[i]), 0, 255);
 }
 
 /*top 5*/
