@@ -113,9 +113,6 @@ new bool:g_bHighlightEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new g_iHighlightColor[3] = {255, 0, 0};
 
-stock BuildMusicConfigKey(const szMusicPath[], szKey[], iKeyLen);
-
-
 public plugin_precache()
 {
 	
