@@ -18,6 +18,7 @@ new const WARMUP_CONFIG_FILE[] = "configs/plugins/warm_up.ini"; // Путь к �
 
 #define TE_BEAMCYLINDER 21
 #define TASK_HIGHLIGHT_LEADER 31415
+#define TASK_SHOW_KING_LABEL 31416
 
 enum _:ePlayerData
 {
@@ -107,6 +108,7 @@ new cvar_name_sv_maxspeed;
 new g_iPlayerTop = 0;
 new g_iTopPlayersCount = 0;
 new g_iRingSprite;
+new g_iKingHudSync;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
 new bool:g_bHighlightEnabled = true;
@@ -148,6 +150,7 @@ public plugin_init()
 	RegisterHookChain(RG_CBasePlayer_TakeDamage, "CBasePlayer_TakeDamage", true);
 	g_iMaxPlayers = get_member_game(m_nMaxPlayers);
 	cvar_name_sv_maxspeed = get_cvar_pointer( "sv_maxspeed" );
+	g_iKingHudSync = CreateHudSyncObj();
 	
 	if (g_pCvar[AUTO_AMMO]) {
 		DisableHookChain(g_hKilled = RegisterHookChain(RG_CBasePlayer_Killed, "CBasePlayer_Killed", true));
@@ -236,7 +239,10 @@ public CSGameRules_CheckMapConditions()
 	//
 	set_task(1.0, "Show_Timer", .flags = "b");
 	if (g_bHighlightEnabled)
+	{
 		set_task(g_flHighlightInterval, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
+		set_task(1.0, "Task_ShowKingLabel", TASK_SHOW_KING_LABEL, .flags = "b");
+	}
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
 	
@@ -284,6 +290,7 @@ public Show_Timer()
 	if (--g_iCountDown == 0)
 	{
 		remove_task(0);
+		remove_task(TASK_SHOW_KING_LABEL);
 		
 		g_iOriginal_sv_maxspeed = get_pcvar_num(cvar_name_sv_maxspeed);
 		log_amx("g_fOriginal_sv_maxspeed = %f", g_iOriginal_sv_maxspeed);
@@ -342,6 +349,27 @@ public Task_HighlightWarmupLeader()
 		return;
 
 	HighlightWarmupLeader();
+}
+
+public Task_ShowKingLabel()
+{
+	if (!g_bFirstKillHappened)
+		return;
+
+	new iLeader = g_iWarmupLeader;
+	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
+		iLeader = GetWarmupLeaderByStats();
+
+	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
+		return;
+
+	g_iWarmupLeader = iLeader;
+
+	new szName[32];
+	get_user_name(iLeader, szName, charsmax(szName));
+
+	set_hudmessage(.red = 255, .green = 215, .blue = 0, .x = -1.0, .y = 0.18, .effects = 0, .fxtime = 0.0, .holdtime = 1.05, .fadeintime = 0.0, .fadeouttime = 0.1, .channel = 4);
+	ShowSyncHudMsg(0, g_iKingHudSync, "КОРОЛЬ: %s", szName);
 }
 
 stock HighlightWarmupLeader()
@@ -1071,6 +1099,7 @@ public ShowStats()
 	if (g_iPlayerTop >= g_iTopPlayersCount || g_iPlayerTop >= sizeof(g_arrData))
 	{
 		remove_task(0);
+		remove_task(TASK_SHOW_KING_LABEL);
 		remove_task(TASK_HIGHLIGHT_LEADER);
 		g_bFirstKillHappened = false;
 		g_iWarmupLeader = 0;
@@ -1152,6 +1181,7 @@ public ShowStats()
 		case 16:
 		{
 			remove_task(0);
+			remove_task(TASK_SHOW_KING_LABEL);
 			remove_task(TASK_HIGHLIGHT_LEADER);
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
@@ -1186,6 +1216,7 @@ public ShowStats()
 		default:
 		{
 			remove_task(0);
+			remove_task(TASK_SHOW_KING_LABEL);
 			remove_task(TASK_HIGHLIGHT_LEADER);
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
