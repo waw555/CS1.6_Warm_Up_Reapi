@@ -112,6 +112,8 @@ new g_iWarmupLeader;
 new bool:g_bHighlightEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new g_iHighlightColor[3] = {255, 0, 0};
+new g_iWarmupResultsFadeAlpha = 180;
+new g_iMsgScreenFade;
 
 public plugin_precache()
 {
@@ -136,6 +138,7 @@ public plugin_precache()
 public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR, URL, DESCRIPTIONPLUGIN);
+	g_iMsgScreenFade = get_user_msgid("ScreenFade");
 	
 	register_event("TextMsg", "event_game_commencing", "a", "2=#Game_Commencing");
 	
@@ -918,6 +921,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				g_flHighlightInterval = floatclamp(str_to_float(value), 0.1, 5.0);
 			if (equal(key, "HIGHLIGHT_COLOR"))
 				ParseHighlightColor(value);
+			if (equal(key, "RESULTS_FADE_ALPHA"))
+				g_iWarmupResultsFadeAlpha = clamp(str_to_num(value), 0, 255);
 		}
 		
 		case PLUGINS:
@@ -1039,10 +1044,73 @@ public fnCompareDamage()
 	
 	// сортировка массива
 	SortCustom2D(g_arrData, sizeof(g_arrData), "SortRoundDamage");
+	FreezePlayersBeforeWarmupResults();
 
 	client_cmd(0, "spk sound/events/task_complete.wav");
 	set_task(0.5, "ShowStats",.flags = "b");
 	return PLUGIN_HANDLED;
+}
+
+
+stock FreezePlayersBeforeWarmupResults()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "ch");
+
+	new Float:flZeroVelocity[3];
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		set_entvar(id, var_velocity, flZeroVelocity);
+		set_entvar(id, var_maxspeed, 1.0);
+		set_entvar(id, var_flags, get_entvar(id, var_flags) | FL_FROZEN);
+		ShowWarmupResultFade(id);
+	}
+}
+
+stock ShowWarmupResultFade(id)
+{
+	if (!g_iMsgScreenFade || g_iWarmupResultsFadeAlpha <= 0)
+		return;
+
+	message_begin(MSG_ONE_UNRELIABLE, g_iMsgScreenFade, _, id);
+	write_short(1<<12);
+	write_short(1<<12);
+	write_short(0x0004); // FFADE_STAYOUT
+	write_byte(0);
+	write_byte(0);
+	write_byte(0);
+	write_byte(g_iWarmupResultsFadeAlpha);
+	message_end();
+}
+
+stock ClearWarmupResultFade(id)
+{
+	if (!g_iMsgScreenFade)
+		return;
+
+	message_begin(MSG_ONE_UNRELIABLE, g_iMsgScreenFade, _, id);
+	write_short(1<<10);
+	write_short(0);
+	write_short(0x0001); // FFADE_IN
+	write_byte(0);
+	write_byte(0);
+	write_byte(0);
+	write_byte(0);
+	message_end();
+}
+
+stock UnfreezePlayersAfterWarmupResults()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "ch");
+
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		set_entvar(id, var_flags, get_entvar(id, var_flags) & ~FL_FROZEN);
+		ClearWarmupResultFade(id);
+	}
 }
 
 // функция сравнения для сортировки
@@ -1076,6 +1144,7 @@ public ShowStats()
 	{
 		remove_task(0);
 		remove_task(TASK_HIGHLIGHT_LEADER);
+		UnfreezePlayersAfterWarmupResults();
 		g_bFirstKillHappened = false;
 		g_iWarmupLeader = 0;
 		g_iCounter = 0;
@@ -1157,6 +1226,7 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
+			UnfreezePlayersAfterWarmupResults();
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
 			g_iCounter = 0;
@@ -1191,6 +1261,7 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
+			UnfreezePlayersAfterWarmupResults();
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
 			g_iCounter = 0;
