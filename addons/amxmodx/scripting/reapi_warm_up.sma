@@ -566,10 +566,11 @@ stock LoadWarmUpMusic()
 		ArrayPushString(g_aMusicFilesOnDisk, szMusicPath);
 
 		new iExists;
+		new bool:bKnownFile = TrieGetCell(g_tKnownMusicFiles, szMusicPath, iExists);
 		new szTrackTitle[64];
-				new bool:bHasTitle = TrieGetString(g_tMusicTitle, szMusicPath, szTrackTitle, charsmax(szTrackTitle)) && szTrackTitle[0];
+		new bool:bHasTitle = TrieGetString(g_tMusicTitle, szMusicPath, szTrackTitle, charsmax(szTrackTitle)) && szTrackTitle[0];
 
-		if (!TrieGetCell(g_tKnownMusicFiles, szMusicPath, iExists) || !bHasTitle)
+		if (!bKnownFile || !bHasTitle)
 		{
 			ReadMp3Meta(szMusicPath, szTrackTitle, charsmax(szTrackTitle));
 
@@ -578,6 +579,13 @@ stock LoadWarmUpMusic()
 				TrieSetString(g_tMusicTitle, szMusicPath, szTrackTitle);
 
 			TrieSetCell(g_tKnownMusicFiles, szMusicPath, 1);
+		}
+
+		if (!bKnownFile)
+		{
+			new iTrackDuration;
+			if (!TrieGetCell(g_tMusicDuration, szMusicPath, iTrackDuration) || iTrackDuration <= 0)
+				TrieSetCell(g_tMusicDuration, szMusicPath, GetDefaultMusicDuration());
 		}
 
 		iFoundTracks++;
@@ -621,7 +629,7 @@ stock ReadMp3Meta(const szMusicPath[], szTrackTitle[], iTitleLen)
 			if (aTag[0] == 'T' && aTag[1] == 'A' && aTag[2] == 'G')
 			{
 				new szArtist[MAX_ARTIST_NAME_LEN + 1], szTitleRaw[MAX_TRACK_NAME_LEN + 1];
-				for (new i = 3, j; i < 33 && j < iTitleLen - 1; i++)
+				for (new i = 3, j = 0; i < 33 && j < iTitleLen - 1; i++)
 				{
 					if (!aTag[i])
 						break;
@@ -629,7 +637,7 @@ stock ReadMp3Meta(const szMusicPath[], szTrackTitle[], iTitleLen)
 					szTitleRaw[j] = '^0';
 				}
 
-				for (new i = 33, j; i < 63 && j < charsmax(szArtist); i++)
+				for (new i = 33, j = 0; i < 63 && j < charsmax(szArtist); i++)
 				{
 					if (!aTag[i])
 						break;
@@ -819,6 +827,15 @@ stock ResolveWarmUpTime(iDefaultWarmTime)
 
 
 	return ClampWarmTime(iDefaultWarmTime);
+}
+
+stock GetDefaultMusicDuration()
+{
+	new iWarmTime = str_to_num(g_szWarmUpTimeMode);
+	if (iWarmTime >= 10 && iWarmTime <= 90)
+		return iWarmTime;
+
+	return 60;
 }
 
 ReadConfig()
