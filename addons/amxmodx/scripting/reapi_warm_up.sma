@@ -111,6 +111,7 @@ new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
 new bool:g_bHighlightEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
+new Float:g_flHighlightRadius = 85.0;
 new g_iHighlightColor[3] = {255, 0, 0};
 new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
@@ -370,7 +371,7 @@ stock HighlightWarmupLeader()
 	vecRingTop[0] = vecOrigin[0];
 	vecRingTop[1] = vecOrigin[1];
 	vecRingTop[2] = vecOrigin[2];
-	vecRingTop[2] += 170.0 + (float(g_iCountDown & 1) * 35.0);
+	vecRingTop[2] += g_flHighlightRadius + (float(g_iCountDown & 1) * (g_flHighlightRadius / 5.0));
 
 	message_begin(MSG_ALL, SVC_TEMPENTITY);
 	write_byte(TE_BEAMCYLINDER);
@@ -921,6 +922,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				g_bHighlightEnabled = bool:clamp(str_to_num(value), 0, 1);
 			if (equal(key, "HIGHLIGHT_INTERVAL"))
 				g_flHighlightInterval = floatclamp(str_to_float(value), 0.1, 5.0);
+			if (equal(key, "HIGHLIGHT_RADIUS"))
+				g_flHighlightRadius = floatclamp(str_to_float(value), 10.0, 500.0);
 			if (equal(key, "HIGHLIGHT_COLOR"))
 				ParseHighlightColor(value);
 			if (equal(key, "RESULTS_FADE_ALPHA"))
