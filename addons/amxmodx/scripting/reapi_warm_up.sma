@@ -46,7 +46,6 @@ enum _:WARM_STRUCT
 	KEVLAR,
 	FALL_DAMAGE,
 	MUSIC[MAX_RESOURCE_PATH_LENGTH],
-	TRACKTIME,
 	TRACK[64],
 };
 
@@ -88,11 +87,11 @@ new const g_eCvarsToDisable[][][] =
 };
 
 new Array:g_aWarm, Array:g_aPlugins, Array:g_aMusicFilesOnDisk;
-new Trie:g_tMusicDuration, Trie:g_tMusicTitle, Trie:g_tKnownMusicFiles;
+new Trie:g_tMusicTitle, Trie:g_tKnownMusicFiles;
 new HookChain:g_hCheckMapConditions, HookChain:g_hDropPlayerItem, HookChain:g_hOnSpawnEquip, HookChain:g_hKilled;
 
 new g_pDefaultCvars[sizeof(g_eCvarsToDisable)][64], g_pCvar[CVARS];
-new g_szWarmUpDescription[64], g_szWarmUpTrack[MAX_TRACK_TITLE_LEN + 1], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", g_szWarmUpTimeMode[16] = "AUTO", Float:g_flMaxHealth, g_iCountDown, g_iSection, g_iTrackTime;
+new g_szWarmUpDescription[64], g_szWarmUpTrack[MAX_TRACK_TITLE_LEN + 1], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", g_szWarmUpTimeMode[16] = "AUTO", Float:g_flMaxHealth, g_iCountDown, g_iSection;
 new g_szWarmUpConfigPath[PLATFORM_MAX_PATH];
 
 /* top 5*/
@@ -117,7 +116,6 @@ public plugin_precache()
 	g_aWarm = ArrayCreate(WARM_STRUCT, 0);
 	g_aPlugins = ArrayCreate(32, 0);
 	g_aMusicFilesOnDisk = ArrayCreate(MAX_RESOURCE_PATH_LENGTH, 0);
-	g_tMusicDuration = TrieCreate();
 	g_tMusicTitle = TrieCreate();
 	g_tKnownMusicFiles = TrieCreate();
 	
@@ -200,9 +198,7 @@ public CSGameRules_CheckMapConditions()
 	set_cvar_float("mp_respawn_immunitytime", aWarm[PROTECTION_TIME]);
 	
 	g_flMaxHealth = aWarm[HEALTH];
-	g_iCountDown = ClampWarmTime(aWarm[TIME]);
-	g_iTrackTime = ClampWarmTime(aWarm[TRACKTIME]);
-	if (g_iTrackTime > g_iCountDown) g_iTrackTime = g_iCountDown;
+	g_iCountDown = ResolveWarmUpTime(aWarm[TIME]);
 	
 	copy(g_szWarmUpDescription, charsmax(g_szWarmUpDescription), aWarm[DESCRIPTION]);
 	copy(g_szWarmUpTrack, charsmax(g_szWarmUpTrack), aWarm[TRACK]);
@@ -211,26 +207,10 @@ public CSGameRules_CheckMapConditions()
 	if (g_szMapWarmUpMusic[0])
 	{
 		bRandomTrackPlayed = true;
-		new iTrackDuration;
-		if (TrieGetCell(g_tMusicDuration, g_szMapWarmUpMusic, iTrackDuration) && iTrackDuration > 0)
-			iTrackDuration = ClampWarmTime(iTrackDuration);
-
-		g_iCountDown = ResolveWarmUpTime(iTrackDuration, g_iCountDown);
-		g_iTrackTime = 0;
 		g_szWarmUpTrack[0] = '^0';
-
-		if (TrieGetCell(g_tMusicDuration, g_szMapWarmUpMusic, iTrackDuration) && iTrackDuration > 0)
-		{
-			g_iTrackTime = ClampWarmTime(iTrackDuration);
-			if (g_iTrackTime > g_iCountDown)
-				g_iTrackTime = g_iCountDown;
-		}
-
-		if (!TrieGetString(g_tMusicTitle, g_szMapWarmUpMusic, g_szWarmUpTrack, charsmax(g_szWarmUpTrack)) || g_iTrackTime <= 0)
-		{
-			g_iTrackTime = 0;
-			g_szWarmUpTrack[0] = '^0';
-		}
+		TrieGetString(g_tMusicTitle, g_szMapWarmUpMusic, g_szWarmUpTrack, charsmax(g_szWarmUpTrack));
+		if (!g_szWarmUpTrack[0])
+			GetTrackName(g_szMapWarmUpMusic, g_szWarmUpTrack, charsmax(g_szWarmUpTrack));
 
 		client_cmd(0, "stopsound; mp3 stop; wait; mp3 play ^"sound/%s^"", g_szMapWarmUpMusic);
 	}
@@ -324,7 +304,7 @@ public Show_Timer()
 	{
 		set_dhudmessage( .red = 255, .green = 0, .blue = 0, .x = -1.0, .y = 0.01, .effects = 0, .fxtime = 0.0, .holdtime = 1.1, .fadeintime = 0.0, .fadeouttime = 0.0);
 		show_dhudmessage(0, "%s", g_szWarmUpDescription);
-		if(--g_iTrackTime <= 0){
+		if(!g_szWarmUpTrack[0]){
 			set_dhudmessage( .red = 0, .green = 255, .blue = 0, .x = -1.0, .y = 0.04, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
 			show_dhudmessage(0, "РАЗМИНКА ЗАКОНЧИТСЯ ЧЕРЕЗ %i СЕК", g_iCountDown);
 		}else{
@@ -577,17 +557,14 @@ stock LoadWarmUpMusic()
 		formatex(szMusicPath, charsmax(szMusicPath), "%s/%s", g_szWarmUpMusicDir, szFile);
 		ArrayPushString(g_aMusicFilesOnDisk, szMusicPath);
 
-		new iExists, iTrackDuration;
+		new iExists;
 		new szTrackTitle[64];
-		new bool:bHasDuration = TrieGetCell(g_tMusicDuration, szMusicPath, iTrackDuration) && iTrackDuration > 0;
-		new bool:bHasTitle = TrieGetString(g_tMusicTitle, szMusicPath, szTrackTitle, charsmax(szTrackTitle)) && szTrackTitle[0];
+				new bool:bHasTitle = TrieGetString(g_tMusicTitle, szMusicPath, szTrackTitle, charsmax(szTrackTitle)) && szTrackTitle[0];
 
-		if (!TrieGetCell(g_tKnownMusicFiles, szMusicPath, iExists) || !bHasDuration || !bHasTitle)
+		if (!TrieGetCell(g_tKnownMusicFiles, szMusicPath, iExists) || !bHasTitle)
 		{
-			ReadMp3Meta(szMusicPath, iTrackDuration, szTrackTitle, charsmax(szTrackTitle));
+			ReadMp3Meta(szMusicPath, szTrackTitle, charsmax(szTrackTitle));
 
-			if (iTrackDuration > 0)
-				TrieSetCell(g_tMusicDuration, szMusicPath, ClampWarmTime(iTrackDuration));
 
 			if (szTrackTitle[0])
 				TrieSetString(g_tMusicTitle, szMusicPath, szTrackTitle);
@@ -609,9 +586,8 @@ stock LoadWarmUpMusic()
 	RewriteMusicConfigSection();
 }
 
-stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
+stock ReadMp3Meta(const szMusicPath[], szTrackTitle[], iTitleLen)
 {
-	iDuration = 0;
 	szTrackTitle[0] = '^0';
 
 	new szFullPath[PLATFORM_MAX_PATH];
@@ -625,12 +601,6 @@ stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
 	fseek(hFile, 0, SEEK_END);
 	iFileSize = ftell(hFile);
 
-	if (iFileSize > 0)
-	{
-		new iBitrate;
-		if (GetFirstMp3Bitrate(hFile, iBitrate) && iBitrate > 0)
-			iDuration = (iFileSize * 8) / (iBitrate * 1000);
-	}
 
 	new iTagPos = iFileSize - 128;
 	if (iTagPos >= 0)
@@ -684,35 +654,6 @@ stock ReadMp3Meta(const szMusicPath[], &iDuration, szTrackTitle[], iTitleLen)
 	NormalizeTrackTitle(szTrackTitle, iTitleLen);
 }
 
-stock bool:GetFirstMp3Bitrate(hFile, &iBitrate)
-{
-	iBitrate = 0;
-	fseek(hFile, 0, SEEK_SET);
-
-	new aBuf[4];
-	while (!feof(hFile))
-	{
-		if (fread_blocks(hFile, aBuf, sizeof(aBuf), BLOCK_BYTE) != sizeof(aBuf))
-			break;
-
-		if (aBuf[0] == 0xFF && (aBuf[1] & 0xE0) == 0xE0)
-		{
-			new iBitrateIndex = (aBuf[2] >> 4) & 0x0F;
-			new const aBitrates[16] = { 0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0 };
-
-			if (iBitrateIndex > 0 && iBitrateIndex < 15)
-			{
-				iBitrate = aBitrates[iBitrateIndex];
-				return true;
-			}
-		}
-
-		fseek(hFile, -3, SEEK_CUR);
-	}
-
-	return false;
-}
-
 stock RewriteMusicConfigSection()
 {
 	if (!g_szWarmUpConfigPath[0])
@@ -759,12 +700,8 @@ stock RewriteMusicConfigSection()
 	for (new i; i < ArraySize(g_aMusicFilesOnDisk); i++)
 	{
 		new szMusicPath[MAX_RESOURCE_PATH_LENGTH], szTrackTitle[MAX_TRACK_TITLE_LEN + 1], szNewEntry[320];
-		new iDuration;
 
 		ArrayGetString(g_aMusicFilesOnDisk, i, szMusicPath, charsmax(szMusicPath));
-		TrieGetCell(g_tMusicDuration, szMusicPath, iDuration);
-		if (iDuration > 0)
-			iDuration = ClampWarmTime(iDuration);
 		TrieGetString(g_tMusicTitle, szMusicPath, szTrackTitle, charsmax(szTrackTitle));
 
 		NormalizeTrackTitle(szTrackTitle, charsmax(szTrackTitle));
@@ -772,10 +709,7 @@ stock RewriteMusicConfigSection()
 		if (!szTrackTitle[0])
 			copy(szTrackTitle, charsmax(szTrackTitle), "УКАЖИТЕ НАЗВАНИЕ ТРЕКА");
 
-		if (iDuration <= 0)
-			formatex(szNewEntry, charsmax(szNewEntry), "%s = УКАЖИТЕ ВРЕМЯ ФАЙЛА | %s", szMusicPath, szTrackTitle);
-		else
-			formatex(szNewEntry, charsmax(szNewEntry), "%s = %d | %s", szMusicPath, iDuration, szTrackTitle);
+		formatex(szNewEntry, charsmax(szNewEntry), "%s = %s", szMusicPath, szTrackTitle);
 
 		write_file(g_szWarmUpConfigPath, szNewEntry, -1);
 	}
@@ -859,7 +793,7 @@ stock ClampWarmTime(iTime)
 	return iTime;
 }
 
-stock ResolveWarmUpTime(iTrackDuration, iDefaultWarmTime)
+stock ResolveWarmUpTime(iDefaultWarmTime)
 {
 	if (!equali(g_szWarmUpTimeMode, "AUTO"))
 	{
@@ -868,8 +802,6 @@ stock ResolveWarmUpTime(iTrackDuration, iDefaultWarmTime)
 			return iManualTime;
 	}
 
-	if (iTrackDuration >= 10 && iTrackDuration <= 90)
-		return iTrackDuration;
 
 	return ClampWarmTime(iDefaultWarmTime);
 }
@@ -964,7 +896,6 @@ public bool:values(INIParser:handle, const key[], const value[])
 				aWarm[KEVLAR] = str_to_num(aData[6]);
 				aWarm[FALL_DAMAGE] = str_to_num(aData[7]);
 				copy(aWarm[MUSIC], charsmax(aWarm[MUSIC]), aData[8]);
-				aWarm[TRACKTIME] = str_to_num(aData[9]);
 				copy(aWarm[TRACK], charsmax(aWarm[TRACK]), aData[10]);
 				
 				
@@ -981,24 +912,18 @@ public bool:values(INIParser:handle, const key[], const value[])
 
 		case MUSIC_FILES:
 		{
-			new aMusicData[2][256];
+			new szTrackTitle[256], aMusicData[2][256];
 			if (explode_string(value, " | ", aMusicData, sizeof(aMusicData), charsmax(aMusicData[])) == 2)
+				copy(szTrackTitle, charsmax(szTrackTitle), aMusicData[1]);
+			else
+				copy(szTrackTitle, charsmax(szTrackTitle), value);
+
+			trim(szTrackTitle);
+			if (!equal(szTrackTitle, "УКАЖИТЕ НАЗВАНИЕ ТРЕКА") && szTrackTitle[0])
 			{
-				trim(aMusicData[0]);
-				trim(aMusicData[1]);
-
-				new iDuration = str_to_num(aMusicData[0]);
-				if (iDuration > 0)
-					TrieSetCell(g_tMusicDuration, key, ClampWarmTime(iDuration));
-
-				if (!equal(aMusicData[1], "УКАЖИТЕ НАЗВАНИЕ ТРЕКА") && aMusicData[1][0])
-				{
-					NormalizeTrackTitle(aMusicData[1], charsmax(aMusicData[]));
-					TrieSetString(g_tMusicTitle, key, aMusicData[1]);
-				}
-
-				if (iDuration > 0 && !equal(aMusicData[1], "УКАЖИТЕ НАЗВАНИЕ ТРЕКА") && aMusicData[1][0])
-					TrieSetCell(g_tKnownMusicFiles, key, 1);
+				NormalizeTrackTitle(szTrackTitle, charsmax(szTrackTitle));
+				TrieSetString(g_tMusicTitle, key, szTrackTitle);
+				TrieSetCell(g_tKnownMusicFiles, key, 1);
 			}
 		}
 	}
