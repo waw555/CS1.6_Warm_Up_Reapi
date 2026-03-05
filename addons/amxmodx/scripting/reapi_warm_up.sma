@@ -312,9 +312,12 @@ public Show_Timer()
 	}
 	else
 	{
+		if (g_iWarmUpTrackTime > 0)
+			g_iWarmUpTrackTime--;
+
 		set_dhudmessage( .red = 255, .green = 0, .blue = 0, .x = -1.0, .y = 0.01, .effects = 0, .fxtime = 0.0, .holdtime = 1.1, .fadeintime = 0.0, .fadeouttime = 0.0);
 		show_dhudmessage(0, "%s", g_szWarmUpDescription);
-		if(!g_szWarmUpTrack[0]){
+		if(!g_szWarmUpTrack[0] || g_iWarmUpTrackTime <= 0){
 			set_dhudmessage( .red = 0, .green = 255, .blue = 0, .x = -1.0, .y = 0.04, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
 			show_dhudmessage(0, "РАЗМИНКА ЗАКОНЧИТСЯ ЧЕРЕЗ %i СЕК", g_iCountDown);
 		}else{
