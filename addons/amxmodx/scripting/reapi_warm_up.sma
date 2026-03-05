@@ -114,6 +114,7 @@ new Float:g_flHighlightInterval = 5.0;
 new g_iHighlightColor[3] = {255, 0, 0};
 new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
+new bool:g_bWarmupRestartPending;
 
 public plugin_precache()
 {
@@ -244,6 +245,7 @@ public CSGameRules_CheckMapConditions()
 	}
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
+	g_bWarmupRestartPending = false;
 	
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
@@ -1122,6 +1124,12 @@ public SortRoundDamage(const elem1[], const elem2[])
 
 public CSGameRules_RestartRound_Post()
 {
+	if (g_bWarmupRestartPending)
+	{
+		UnfreezePlayersAfterWarmupResults();
+		g_bWarmupRestartPending = false;
+	}
+
 	new iPlayers[MAX_PLAYERS], iNum, iPlayer;
 	
 	get_players(iPlayers, iNum, "h");
@@ -1226,7 +1234,7 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
-			UnfreezePlayersAfterWarmupResults();
+			g_bWarmupRestartPending = true;
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
 			g_iCounter = 0;
@@ -1261,7 +1269,7 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
-			UnfreezePlayersAfterWarmupResults();
+			g_bWarmupRestartPending = true;
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
 			g_iCounter = 0;
