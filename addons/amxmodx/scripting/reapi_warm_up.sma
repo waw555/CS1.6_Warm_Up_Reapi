@@ -434,9 +434,6 @@ public client_disconnected(id)
 
 stock UpdateWarmupLeaderLabel(iLeader)
 {
-	if (!native_exists("Attach3DTextLabelToPlayer"))
-		return;
-
 	if (IsPlayer(g_iLeaderLabelPlayer) && is_user_connected(g_iLeaderLabelPlayer) && g_iLeaderLabelPlayer != iLeader)
 		Attach3DTextLabelToPlayer(g_iLeaderLabelPlayer, "");
 
