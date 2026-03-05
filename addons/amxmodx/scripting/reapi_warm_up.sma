@@ -8,6 +8,8 @@
 #define URL "None"
 #define DESCRIPTIONPLUGIN "Plugin for Warm Up"
 
+new const WARMUP_CONFIG_FILE[] = "configs/plugins/warm_up.ini"; // Путь к файлу конфигурации относительно папки amxmodx
+
 #define IsPlayer(%1)    (1 <= %1 && %1 <= g_iMaxPlayers)	//	Проверяем, что это игрок,  а не какой либо объект.
 #define ClearArr(%1)    arrayset(_:%1, _:0.0, sizeof(%1))	//	Очищаем массив
 #define MAX_ARTIST_NAME_LEN 50
@@ -811,8 +813,9 @@ stock GetDefaultMusicDuration()
 
 ReadConfig()
 {
-	get_configsdir(g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath));
-	strcat(g_szWarmUpConfigPath, "/plugins/warm_up.ini", charsmax(g_szWarmUpConfigPath));
+	get_localinfo("amxx_basedir", g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath));
+	add(g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath), "/");
+	add(g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath), WARMUP_CONFIG_FILE);
 	
 	if (!file_exists(g_szWarmUpConfigPath))
 		return false;
