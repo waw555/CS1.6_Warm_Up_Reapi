@@ -355,6 +355,8 @@ public Task_HighlightWarmupLeader()
 
 stock HighlightWarmupLeader()
 {
+	static bool:bPulseExpand;
+
 	new iLeader = g_iWarmupLeader;
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
 		iLeader = GetWarmupLeaderByStats();
@@ -366,22 +368,23 @@ stock HighlightWarmupLeader()
 
 	g_iWarmupLeader = iLeader;
 
-	new Float:vecOrigin[3], Float:vecRingTop[3];
+	new Float:vecOrigin[3], Float:vecRingCenter[3], Float:flPulseRadius;
 	get_entvar(iLeader, var_origin, vecOrigin);
+	bPulseExpand = !bPulseExpand;
+	flPulseRadius = g_flHighlightRadius + (bPulseExpand ? (g_flHighlightRadius / 5.0) : 0.0);
 
-	vecRingTop[0] = vecOrigin[0];
-	vecRingTop[1] = vecOrigin[1];
-	vecRingTop[2] = vecOrigin[2];
-	vecRingTop[2] += g_flHighlightHeight + (float(g_iCountDown & 1) * (g_flHighlightHeight / 5.0));
+	vecRingCenter[0] = vecOrigin[0];
+	vecRingCenter[1] = vecOrigin[1];
+	vecRingCenter[2] = vecOrigin[2] + g_flHighlightHeight;
 
 	message_begin(MSG_ALL, SVC_TEMPENTITY);
 	write_byte(TE_BEAMCYLINDER);
-	engfunc(EngFunc_WriteCoord, vecOrigin[0]);
-	engfunc(EngFunc_WriteCoord, vecOrigin[1]);
-	engfunc(EngFunc_WriteCoord, vecOrigin[2] + 5.0);
-	engfunc(EngFunc_WriteCoord, vecRingTop[0]);
-	engfunc(EngFunc_WriteCoord, vecRingTop[1]);
-	engfunc(EngFunc_WriteCoord, vecRingTop[2]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[2]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[0] + flPulseRadius);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[2]);
 	write_short(g_iRingSprite);
 	write_byte(0);
 	write_byte(0);
