@@ -957,10 +957,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				
 				
 				
-				if (file_exists(fmt("sound/%s", aWarm[MUSIC])) /* && containi(aWarm[MUSIC], ".mp3") != -1 no care */ )
+				if (!file_exists(fmt("sound/%s", aWarm[MUSIC])) /* && containi(aWarm[MUSIC], ".mp3") != -1 no care */ )
 				{
-					precache_generic(fmt("sound/%s", aWarm[MUSIC]));
-				} else {
 					aWarm[MUSIC] = '^0';
 				}
 				ArrayPushArray(g_aWarm, aWarm);
