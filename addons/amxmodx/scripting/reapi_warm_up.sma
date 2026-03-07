@@ -956,7 +956,14 @@ public bool:values(INIParser:handle, const key[], const value[])
 		case WEAPS:
 		{
 			new aData[11][256], aWarm[WARM_STRUCT];
-			if (explode_string(key, " | ", aData, sizeof(aData), charsmax(aData[])) == 11)
+			new szWarmLine[256];
+
+			copy(szWarmLine, charsmax(szWarmLine), key);
+			if (!szWarmLine[0])
+				copy(szWarmLine, charsmax(szWarmLine), value);
+
+			new iParts = explode_string(szWarmLine, " | ", aData, sizeof(aData), charsmax(aData[]));
+			if (iParts == 8 || iParts == 11)
 			{
 				copy(aWarm[GUNS], charsmax(aWarm[GUNS]), aData[0]);
 				copy(aWarm[DESCRIPTION], charsmax(aWarm[DESCRIPTION]), aData[1]);
@@ -966,11 +973,18 @@ public bool:values(INIParser:handle, const key[], const value[])
 				aWarm[TIME] = str_to_num(aData[5]);
 				aWarm[KEVLAR] = str_to_num(aData[6]);
 				aWarm[FALL_DAMAGE] = str_to_num(aData[7]);
-				copy(aWarm[MUSIC], charsmax(aWarm[MUSIC]), aData[8]);
-				copy(aWarm[TRACK], charsmax(aWarm[TRACK]), aData[10]);
-				
-				
-				
+
+				if (iParts == 11)
+				{
+					copy(aWarm[MUSIC], charsmax(aWarm[MUSIC]), aData[8]);
+					copy(aWarm[TRACK], charsmax(aWarm[TRACK]), aData[10]);
+				}
+				else
+				{
+					aWarm[MUSIC] = '^0';
+					aWarm[TRACK] = '^0';
+				}
+
 				if (!file_exists(fmt("sound/%s", aWarm[MUSIC])) /* && containi(aWarm[MUSIC], ".mp3") != -1 no care */ )
 				{
 					aWarm[MUSIC] = '^0';
