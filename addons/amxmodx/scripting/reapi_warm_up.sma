@@ -111,7 +111,12 @@ new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
 new bool:g_bHighlightEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
+new Float:g_flHighlightRadius = 85.0;
+new Float:g_flHighlightHeight = 0.0;
 new g_iHighlightColor[3] = {255, 0, 0};
+new g_iWarmupResultsFadeAlpha = 180;
+new g_iMsgScreenFade;
+new bool:g_bWarmupRestartPending;
 
 public plugin_precache()
 {
@@ -136,6 +141,7 @@ public plugin_precache()
 public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR, URL, DESCRIPTIONPLUGIN);
+	g_iMsgScreenFade = get_user_msgid("ScreenFade");
 	
 	register_event("TextMsg", "event_game_commencing", "a", "2=#Game_Commencing");
 	
@@ -236,9 +242,12 @@ public CSGameRules_CheckMapConditions()
 	//
 	set_task(1.0, "Show_Timer", .flags = "b");
 	if (g_bHighlightEnabled)
+	{
 		set_task(g_flHighlightInterval, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
+	}
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
+	g_bWarmupRestartPending = false;
 	
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
@@ -346,31 +355,36 @@ public Task_HighlightWarmupLeader()
 
 stock HighlightWarmupLeader()
 {
+	static bool:bPulseExpand;
+
 	new iLeader = g_iWarmupLeader;
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
 		iLeader = GetWarmupLeaderByStats();
 
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
+	{
 		return;
+	}
 
 	g_iWarmupLeader = iLeader;
 
-	new Float:vecOrigin[3], Float:vecRingTop[3];
+	new Float:vecOrigin[3], Float:vecRingCenter[3], Float:flPulseRadius;
 	get_entvar(iLeader, var_origin, vecOrigin);
+	bPulseExpand = !bPulseExpand;
+	flPulseRadius = g_flHighlightRadius + (bPulseExpand ? (g_flHighlightRadius / 5.0) : 0.0);
 
-	vecRingTop[0] = vecOrigin[0];
-	vecRingTop[1] = vecOrigin[1];
-	vecRingTop[2] = vecOrigin[2];
-	vecRingTop[2] += 170.0 + (float(g_iCountDown & 1) * 35.0);
+	vecRingCenter[0] = vecOrigin[0];
+	vecRingCenter[1] = vecOrigin[1];
+	vecRingCenter[2] = vecOrigin[2] + g_flHighlightHeight;
 
 	message_begin(MSG_ALL, SVC_TEMPENTITY);
 	write_byte(TE_BEAMCYLINDER);
-	engfunc(EngFunc_WriteCoord, vecOrigin[0]);
-	engfunc(EngFunc_WriteCoord, vecOrigin[1]);
-	engfunc(EngFunc_WriteCoord, vecOrigin[2] + 5.0);
-	engfunc(EngFunc_WriteCoord, vecRingTop[0]);
-	engfunc(EngFunc_WriteCoord, vecRingTop[1]);
-	engfunc(EngFunc_WriteCoord, vecRingTop[2]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[2]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[2] + flPulseRadius);
 	write_short(g_iRingSprite);
 	write_byte(0);
 	write_byte(0);
@@ -394,7 +408,9 @@ stock GetWarmupLeaderByStats()
 		if (!is_user_connected(id) || !is_user_alive(id))
 			continue;
 
-		if (g_iPlayerDmg[id] > iMaxDamage || (g_iPlayerDmg[id] == iMaxDamage && g_iPlayerKills[id] > iMaxKills))
+		if (g_iPlayerKills[id] > iMaxKills
+		|| (g_iPlayerKills[id] == iMaxKills && g_iPlayerDmg[id] > iMaxDamage)
+		|| (g_iPlayerKills[id] == iMaxKills && g_iPlayerDmg[id] == iMaxDamage && (!iLeader || id < iLeader)))
 		{
 			iMaxDamage = g_iPlayerDmg[id];
 			iMaxKills = g_iPlayerKills[id];
@@ -910,8 +926,14 @@ public bool:values(INIParser:handle, const key[], const value[])
 				g_bHighlightEnabled = bool:clamp(str_to_num(value), 0, 1);
 			if (equal(key, "HIGHLIGHT_INTERVAL"))
 				g_flHighlightInterval = floatclamp(str_to_float(value), 0.1, 5.0);
+			if (equal(key, "HIGHLIGHT_RADIUS"))
+				g_flHighlightRadius = floatclamp(str_to_float(value), 10.0, 500.0);
+			if (equal(key, "HIGHLIGHT_HEIGHT"))
+				g_flHighlightHeight = floatclamp(str_to_float(value), -100.0, 100.0);
 			if (equal(key, "HIGHLIGHT_COLOR"))
 				ParseHighlightColor(value);
+			if (equal(key, "RESULTS_FADE_ALPHA"))
+				g_iWarmupResultsFadeAlpha = clamp(str_to_num(value), 0, 255);
 		}
 		
 		case PLUGINS:
@@ -935,10 +957,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				
 				
 				
-				if (file_exists(fmt("sound/%s", aWarm[MUSIC])) /* && containi(aWarm[MUSIC], ".mp3") != -1 no care */ )
+				if (!file_exists(fmt("sound/%s", aWarm[MUSIC])) /* && containi(aWarm[MUSIC], ".mp3") != -1 no care */ )
 				{
-					precache_generic(fmt("sound/%s", aWarm[MUSIC]));
-				} else {
 					aWarm[MUSIC] = '^0';
 				}
 				ArrayPushArray(g_aWarm, aWarm);
@@ -1002,7 +1022,12 @@ public CBasePlayer_TakeDamage(const pevVictim, pevInflictor, const pevAttacker, 
 		return HC_CONTINUE;
 	
 	if(rg_is_player_can_takedamage(pevVictim, pevAttacker))
+	{
 		g_iPlayerDmg[pevAttacker] += floatround(flDamage);
+
+		if (g_bFirstKillHappened)
+			g_iWarmupLeader = GetWarmupLeaderByStats();
+	}
 	
 	return HC_CONTINUE;
 }
@@ -1028,10 +1053,73 @@ public fnCompareDamage()
 	
 	// сортировка массива
 	SortCustom2D(g_arrData, sizeof(g_arrData), "SortRoundDamage");
+	FreezePlayersBeforeWarmupResults();
 
 	client_cmd(0, "spk sound/events/task_complete.wav");
 	set_task(0.5, "ShowStats",.flags = "b");
 	return PLUGIN_HANDLED;
+}
+
+
+stock FreezePlayersBeforeWarmupResults()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "ch");
+
+	new Float:flZeroVelocity[3];
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		set_entvar(id, var_velocity, flZeroVelocity);
+		set_entvar(id, var_maxspeed, 1.0);
+		set_entvar(id, var_flags, get_entvar(id, var_flags) | FL_FROZEN);
+		ShowWarmupResultFade(id);
+	}
+}
+
+stock ShowWarmupResultFade(id)
+{
+	if (!g_iMsgScreenFade || g_iWarmupResultsFadeAlpha <= 0)
+		return;
+
+	message_begin(MSG_ONE_UNRELIABLE, g_iMsgScreenFade, _, id);
+	write_short(1<<12);
+	write_short(1<<12);
+	write_short(0x0004); // FFADE_STAYOUT
+	write_byte(0);
+	write_byte(0);
+	write_byte(0);
+	write_byte(g_iWarmupResultsFadeAlpha);
+	message_end();
+}
+
+stock ClearWarmupResultFade(id)
+{
+	if (!g_iMsgScreenFade)
+		return;
+
+	message_begin(MSG_ONE_UNRELIABLE, g_iMsgScreenFade, _, id);
+	write_short(1<<10);
+	write_short(0);
+	write_short(0x0001); // FFADE_IN
+	write_byte(0);
+	write_byte(0);
+	write_byte(0);
+	write_byte(0);
+	message_end();
+}
+
+stock UnfreezePlayersAfterWarmupResults()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "ch");
+
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		set_entvar(id, var_flags, get_entvar(id, var_flags) & ~FL_FROZEN);
+		ClearWarmupResultFade(id);
+	}
 }
 
 // функция сравнения для сортировки
@@ -1043,6 +1131,12 @@ public SortRoundDamage(const elem1[], const elem2[])
 
 public CSGameRules_RestartRound_Post()
 {
+	if (g_bWarmupRestartPending)
+	{
+		UnfreezePlayersAfterWarmupResults();
+		g_bWarmupRestartPending = false;
+	}
+
 	new iPlayers[MAX_PLAYERS], iNum, iPlayer;
 	
 	get_players(iPlayers, iNum, "h");
@@ -1065,6 +1159,7 @@ public ShowStats()
 	{
 		remove_task(0);
 		remove_task(TASK_HIGHLIGHT_LEADER);
+		UnfreezePlayersAfterWarmupResults();
 		g_bFirstKillHappened = false;
 		g_iWarmupLeader = 0;
 		g_iCounter = 0;
@@ -1146,6 +1241,7 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
+			g_bWarmupRestartPending = true;
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
 			g_iCounter = 0;
@@ -1180,6 +1276,7 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
+			g_bWarmupRestartPending = true;
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
 			g_iCounter = 0;
