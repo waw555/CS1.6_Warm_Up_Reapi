@@ -110,6 +110,7 @@ new g_iTopPlayersCount = 0;
 new g_iRingSprite;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
+new g_iHighlightedLeader;
 new bool:g_bHighlightEnabled = true;
 new bool:g_bHighlightModelEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
@@ -273,6 +274,7 @@ public CSGameRules_CheckMapConditions()
 	ResetWarmupLeaderModelRendering();
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
+	g_iHighlightedLeader = 0;
 	g_bWarmupRestartPending = false;
 	
 	// 
@@ -404,7 +406,7 @@ public Task_HighlightWarmupLeader()
 stock HighlightWarmupLeader()
 {
 	static bool:bPulseExpand;
-	new iPrevLeader = g_iWarmupLeader;
+	new iPrevLeader = g_iHighlightedLeader;
 
 	new iLeader = g_iWarmupLeader;
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
@@ -412,11 +414,16 @@ stock HighlightWarmupLeader()
 
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
 	{
+		if (IsPlayer(iPrevLeader))
+			ResetLeaderModelRendering(iPrevLeader);
+
+		g_iHighlightedLeader = 0;
 		return;
 	}
 
 	g_iWarmupLeader = iLeader;
-	if (iPrevLeader != iLeader)
+	g_iHighlightedLeader = iLeader;
+	if (iPrevLeader != iLeader && IsPlayer(iPrevLeader))
 		ResetLeaderModelRendering(iPrevLeader);
 
 	if (g_bHighlightModelEnabled)
@@ -1218,6 +1225,8 @@ public client_disconnected(id)
 {
 	if (id == g_iWarmupLeader)
 		g_iWarmupLeader = 0;
+	if (id == g_iHighlightedLeader)
+		g_iHighlightedLeader = 0;
 
 	ResetLeaderModelRendering(id);
 }
@@ -1263,6 +1272,7 @@ public fnCompareDamage()
 	SortCustom2D(g_arrData, sizeof(g_arrData), "SortRoundDamage");
 	remove_task(TASK_HIGHLIGHT_LEADER);
 	ResetWarmupLeaderModelRendering();
+	g_iHighlightedLeader = 0;
 	FreezePlayersBeforeWarmupResults();
 
 	client_cmd(0, "spk sound/events/task_complete.wav");
@@ -1469,6 +1479,7 @@ stock FinishWarmupAndRestart()
 	g_bWarmupCompleted = true;
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
+	g_iHighlightedLeader = 0;
 	g_iCounter = 0;
 	g_iPlayerTop = 0;
 	DisableHookChain(g_hDropPlayerItem);
