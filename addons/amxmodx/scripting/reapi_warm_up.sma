@@ -850,14 +850,34 @@ stock GetDefaultMusicDuration()
 	return 60;
 }
 
+stock StripInlineComment(szText[], iLen)
+{
+	new bool:bInDoubleQuotes, bool:bInSingleQuotes;
+	for (new i; i < iLen && szText[i] != '^0'; i++)
+	{
+		if (szText[i] == 34 && !bInSingleQuotes)
+			bInDoubleQuotes = !bInDoubleQuotes;
+		else if (szText[i] == 39 && !bInDoubleQuotes)
+			bInSingleQuotes = !bInSingleQuotes;
+		else if (szText[i] == ';' && !bInDoubleQuotes && !bInSingleQuotes)
+		{
+			szText[i] = '^0';
+			break;
+		}
+	}
+
+	trim(szText);
+}
+
 stock NormalizeMusicFolderPath(szPath[], iLen)
 {
+	StripInlineComment(szPath, iLen);
 	trim(szPath);
 
 	new iLastChar = strlen(szPath) - 1;
 	if (iLastChar > 0)
 	{
-		if ((szPath[0] == '"' && szPath[iLastChar] == '"') || (szPath[0] == '\'' && szPath[iLastChar] == '\''))
+		if ((szPath[0] == '"' && szPath[iLastChar] == '"') || (szPath[0] == 39 && szPath[iLastChar] == 39))
 		{
 			szPath[iLastChar] = '^0';
 			copy(szPath, iLen, szPath[1]);
