@@ -546,7 +546,10 @@ stock LoadWarmUpMusic()
 	new hDir = open_dir(szFolderPath, szFile, charsmax(szFile), iType);
 
 	if (!hDir)
+	{
+		RewriteMusicConfigSection();
 		return;
+	}
 
 	new iFoundTracks;
 	do
@@ -811,7 +814,7 @@ stock bool:IsLikelyReadableTitle(const szText[])
 {
 	for (new i; szText[i] != '^0'; i++)
 	{
-		if (szText[i] < 32 || szText[i] > 126)
+		if (szText[i] < 32)
 			return false;
 	}
 
@@ -852,6 +855,8 @@ stock GetDefaultMusicDuration()
 
 ReadConfig()
 {
+	g_iSection = NULL;
+
 	get_localinfo("amxx_basedir", g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath));
 	add(g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath), "/");
 	add(g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath), WARMUP_CONFIG_FILE);
@@ -873,6 +878,8 @@ ReadConfig()
 
 public bool:sections(INIParser:handle, const section[], bool:invalid_tokens, bool:close_bracket)
 {
+	g_iSection = NULL;
+
 	if (!close_bracket)
 		return false;
 	
@@ -900,7 +907,7 @@ public bool:sections(INIParser:handle, const section[], bool:invalid_tokens, boo
 		return true;
 	}
 	
-	return false;
+	return true;
 }
 
 public bool:values(INIParser:handle, const key[], const value[])
