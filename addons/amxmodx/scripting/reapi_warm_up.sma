@@ -120,7 +120,14 @@ new g_iHighlightModelColor[3] = {255, 0, 0};
 new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
 new bool:g_bWarmupRestartPending;
+new bool:g_bLeaderKillBonusEnabled = true;
+new g_iLeaderKillBonus = 1;
+new bool:g_bLeaderDamageBonusEnabled = true;
+new g_iLeaderDamageBonusPercent = 50;
 
+new const UNKNOWN_ARTIST_TITLE[] = "НЕИЗВЕСТНЫЙ ИСПОЛНИТЕЛЬ";
+
+// Создает структуры плагина, читает конфиг и прекеширует ресурсы.
 public plugin_precache()
 {
 	
@@ -141,6 +148,7 @@ public plugin_precache()
 	g_iRingSprite = precache_model("sprites/shockwave.spr");
 }
 
+// Регистрирует плагин, события и игровые хуки.
 public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR, URL, DESCRIPTIONPLUGIN);
@@ -165,6 +173,7 @@ public plugin_init()
 	}
 }
 
+// Разблокирует условия карты и сбрасывает флаг m_bNotKilled живым игрокам.
 public event_game_commencing()
 {
 	EnableHookChain(g_hCheckMapConditions);
@@ -175,6 +184,7 @@ public event_game_commencing()
 			set_member(i, m_bNotKilled, false);
 }
 
+// Запускает разминку: применяет настройки, оружие, музыку и задачи таймера/подсветки.
 public CSGameRules_CheckMapConditions()
 {
 	DisableHookChain(g_hCheckMapConditions);
@@ -270,24 +280,43 @@ public CSGameRules_CheckMapConditions()
 	}
 }
 
+// Блокирует выбрасывание оружия во время разминки.
 public CBasePlayer_DropPlayerItem()
 {
 	SetHookChainReturn(ATYPE_INTEGER, NULLENT);
 	return HC_SUPERCEDE;
 }
 
+// Выставляет игроку заданное здоровье при спавне.
 public CBasePlayer_OnSpawnEquip(id)
 {
 	set_entvar(id, var_health, g_flMaxHealth);
 	set_entvar(id, var_max_health, g_flMaxHealth);
 }
 
+// Обновляет статистику убийства, бонусы за лидера и текущего лидера разминки.
 public CBasePlayer_Killed(Victim, Attacker, gib)
 {
-
 	if(!is_user_connected(Victim) || !is_user_connected(Attacker) || Victim == Attacker || !IsPlayer(Attacker) || get_member(Victim, m_iTeam) == get_member(Attacker, m_iTeam) || get_member(Victim, m_bKilledByGrenade))
 		return;
-	
+
+	new iLeaderBeforeKill = g_iWarmupLeader;
+	if (!IsPlayer(iLeaderBeforeKill) || !is_user_connected(iLeaderBeforeKill))
+		iLeaderBeforeKill = GetWarmupLeaderByStats();
+
+	if (Victim == iLeaderBeforeKill)
+	{
+		if (g_bLeaderKillBonusEnabled && g_iLeaderKillBonus > 0)
+			g_iPlayerKills[Attacker] += g_iLeaderKillBonus;
+
+		if (g_bLeaderDamageBonusEnabled && g_iLeaderDamageBonusPercent > 0)
+		{
+			new iDamageBonus = floatround(float(g_iPlayerDmg[Victim]) * (float(g_iLeaderDamageBonusPercent) / 100.0));
+			if (iDamageBonus > 0)
+				g_iPlayerDmg[Attacker] += iDamageBonus;
+		}
+	}
+
 	g_iPlayerKills[Attacker]++;
 	g_bFirstKillHappened = true;
 	g_iWarmupLeader = GetWarmupLeaderByStats();
@@ -295,10 +324,11 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 	new pWeapon = get_member(Attacker, m_pActiveItem);
 	if (is_nullent(pWeapon) || ~CSW_ALL_GUNS & 1 << get_member(pWeapon, m_iId))
 		return;
-	
+
 	//rg_instant_reload_weapons(Attacker, pWeapon);
 }
 
+// Обновляет HUD таймер разминки и запускает показ итогов по завершению времени.
 public Show_Timer()
 {
 	if (--g_iCountDown == 0)
@@ -356,6 +386,7 @@ public Show_Timer()
 	}
 }
 
+// Периодически запускает подсветку лидера после первого убийства.
 public Task_HighlightWarmupLeader()
 {
 	if (!g_bFirstKillHappened)
@@ -364,6 +395,7 @@ public Task_HighlightWarmupLeader()
 	HighlightWarmupLeader();
 }
 
+// Подсвечивает лидера эффектом модели и кольцом на земле.
 stock HighlightWarmupLeader()
 {
 	static bool:bPulseExpand;
@@ -430,13 +462,14 @@ stock HighlightWarmupLeader()
 	message_end();
 }
 
+// Выбирает одного лидера по киллам, затем по урону и id.
 stock GetWarmupLeaderByStats()
 {
 	new iLeader, iMaxDamage = -1, iMaxKills = -1;
 
 	for (new id = 1; id <= g_iMaxPlayers; id++)
 	{
-		if (!is_user_connected(id) || !is_user_alive(id))
+		if (!is_user_connected(id))
 			continue;
 
 		if (g_iPlayerKills[id] > iMaxKills
@@ -452,6 +485,7 @@ stock GetWarmupLeaderByStats()
 	return iLeader;
 }
 
+// Выполняет принудительный рестарт раунда и останавливает музыку.
 @restart() 
 {
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
@@ -459,6 +493,7 @@ stock GetWarmupLeaderByStats()
 	set_cvar_num("sv_restart", 1);
 }
 
+// Разбирает список оружия и применяет соответствующие cvar выдачи.
 stock FillWeapons(szGun[])
 {
 	new Trie:tPrimaryWeapon = TrieCreate(),
@@ -565,6 +600,7 @@ stock FillWeapons(szGun[])
 }
 
 
+// Сканирует папку музыки, выбирает случайный трек и синхронизирует MUSIC_FILES.
 stock LoadWarmUpMusic()
 {
 	g_szMapWarmUpMusic[0] = '^0';
@@ -634,6 +670,7 @@ stock LoadWarmUpMusic()
 	RewriteMusicConfigSection();
 }
 
+// Читает ID3v1 теги mp3 и формирует название трека.
 stock ReadMp3Meta(const szMusicPath[], szTrackTitle[], iTitleLen)
 {
 	szTrackTitle[0] = '^0';
@@ -697,11 +734,12 @@ stock ReadMp3Meta(const szMusicPath[], szTrackTitle[], iTitleLen)
 	fclose(hFile);
 
 	if (!szTrackTitle[0])
-		GetTrackName(szMusicPath, szTrackTitle, iTitleLen);
+		copy(szTrackTitle, iTitleLen, UNKNOWN_ARTIST_TITLE);
 
 	NormalizeTrackTitle(szTrackTitle, iTitleLen);
 }
 
+// Полностью пересобирает секцию MUSIC_FILES в конфиге.
 stock RewriteMusicConfigSection()
 {
 	if (!g_szWarmUpConfigPath[0])
@@ -761,7 +799,7 @@ stock RewriteMusicConfigSection()
 			iTrackDuration = 0;
 
 		if (!szTrackTitle[0])
-			copy(szTrackTitle, charsmax(szTrackTitle), "УКАЖИТЕ НАЗВАНИЕ ТРЕКА");
+			copy(szTrackTitle, charsmax(szTrackTitle), UNKNOWN_ARTIST_TITLE);
 
 		if (iTrackDuration > 0)
 			formatex(szNewEntry, charsmax(szNewEntry), "%s = %s | %d", szMusicKey, szTrackTitle, iTrackDuration);
@@ -774,6 +812,7 @@ stock RewriteMusicConfigSection()
 	ArrayDestroy(aLines);
 }
 
+// Получает название трека из имени файла без расширения.
 stock GetTrackName(const szPath[], szTrack[], iLen)
 {
 	new iLastSlash = -1;
@@ -792,6 +831,7 @@ stock GetTrackName(const szPath[], szTrack[], iLen)
 	NormalizeTrackTitle(szTrack, iLen);
 }
 
+// Формирует ключ трека для конфига по имени файла.
 stock BuildMusicConfigKey(const szMusicPath[], szKey[], iKeyLen)
 {
 	new iLastSlash = -1;
@@ -804,6 +844,7 @@ stock BuildMusicConfigKey(const szMusicPath[], szKey[], iKeyLen)
 	copy(szKey, iKeyLen, szMusicPath[(iLastSlash + 1)]);
 }
 
+// Нормализует формат названия трека и удаляет лишние пробелы.
 stock NormalizeTrackTitle(szTrack[], iLen)
 {
 	trim(szTrack);
@@ -841,6 +882,7 @@ stock NormalizeTrackTitle(szTrack[], iLen)
 }
 
 
+// Проверяет, что строка содержит читаемые ASCII-символы.
 stock bool:IsLikelyReadableTitle(const szText[])
 {
 	new bool:bHasReadableChars;
@@ -859,6 +901,7 @@ stock bool:IsLikelyReadableTitle(const szText[])
 	return bHasReadableChars;
 }
 
+// Ограничивает длительность разминки диапазоном 10..90 секунд.
 stock ClampWarmTime(iTime)
 {
 	if (iTime < 10)
@@ -869,6 +912,7 @@ stock ClampWarmTime(iTime)
 	return iTime;
 }
 
+// Возвращает итоговое время разминки с учетом режима AUTO/ручного значения.
 stock ResolveWarmUpTime(iDefaultWarmTime)
 {
 	if (!equali(g_szWarmUpTimeMode, "AUTO"))
@@ -882,6 +926,7 @@ stock ResolveWarmUpTime(iDefaultWarmTime)
 	return ClampWarmTime(iDefaultWarmTime);
 }
 
+// Возвращает дефолтную длительность трека для MUSIC_FILES.
 stock GetDefaultMusicDuration()
 {
 	new iWarmTime = str_to_num(g_szWarmUpTimeMode);
@@ -891,6 +936,49 @@ stock GetDefaultMusicDuration()
 	return 60;
 }
 
+// Создает warm_up.ini с базовыми секциями и значениями по умолчанию.
+stock CreateDefaultConfigFile()
+{
+	new const szDefaultConfig[][] =
+	{
+		";",
+		"; Конфигурационный файл WARM UP v. 1.0.0 by Emma Jule",
+		";",
+		"; Некоторые настройки самой системы",
+		"[VARIABLES]",
+		"	RESTART = 1",
+		"	AUTO_AMMO = 1",
+		"	PAUSE_STATS = 1",
+		"	MUSIC_FOLDER = ms/Warm_Up",
+		"	WARMUP_TIME = AUTO",
+		"	HIGHLIGHT_ENABLED = 1",
+		"	HIGHLIGHT_MODEL_ENABLED = 1",
+		"	HIGHLIGHT_INTERVAL = 5.0",
+		"	HIGHLIGHT_RADIUS = 100.0",
+		"	HIGHLIGHT_HEIGHT = 0.0",
+		"	HIGHLIGHT_COLOR = 0 255 0",
+		"	HIGHLIGHT_MODEL_COLOR = 255 0 0",
+		"	RESULTS_FADE_ALPHA = 180",
+		"	LEADER_KILL_BONUS_ENABLED = 1",
+		"	LEADER_KILL_BONUS = 1",
+		"	LEADER_DAMAGE_BONUS_ENABLED = 1",
+		"	LEADER_DAMAGE_BONUS_PERCENT = 50",
+		"",
+		"[PLUGINS]",
+		"	Knife_Duel",
+		"	ms_throws_knife",
+		"",
+		"[WEAPS]",
+		"knife | РАЗМИНКА | 35.0 | 1.0 | 1.0 | 60 | 2 | 1",
+		"",
+		"[MUSIC_FILES]"
+	};
+
+	for (new i; i < sizeof(szDefaultConfig); i++)
+		write_file(g_szWarmUpConfigPath, szDefaultConfig[i], -1);
+}
+
+// Загружает конфиг разминки и создает его при отсутствии.
 ReadConfig()
 {
 	g_iSection = NULL;
@@ -900,7 +988,7 @@ ReadConfig()
 	add(g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath), WARMUP_CONFIG_FILE);
 	
 	if (!file_exists(g_szWarmUpConfigPath))
-		return false;
+		CreateDefaultConfigFile();
 	
 	new INIParser:parser = INI_CreateParser();
 
@@ -914,6 +1002,7 @@ ReadConfig()
 	return true;
 }
 
+// Определяет текущую секцию INI-парсера.
 public bool:sections(INIParser:handle, const section[], bool:invalid_tokens, bool:close_bracket)
 {
 	g_iSection = NULL;
@@ -948,6 +1037,7 @@ public bool:sections(INIParser:handle, const section[], bool:invalid_tokens, boo
 	return true;
 }
 
+// Обрабатывает ключи INI и заполняет настройки плагина.
 public bool:values(INIParser:handle, const key[], const value[])
 {
 	switch (g_iSection)
@@ -983,6 +1073,14 @@ public bool:values(INIParser:handle, const key[], const value[])
 				ParseHighlightModelColor(value);
 			if (equal(key, "RESULTS_FADE_ALPHA"))
 				g_iWarmupResultsFadeAlpha = clamp(str_to_num(value), 0, 255);
+			if (equal(key, "LEADER_KILL_BONUS_ENABLED"))
+				g_bLeaderKillBonusEnabled = bool:clamp(str_to_num(value), 0, 1);
+			if (equal(key, "LEADER_KILL_BONUS"))
+				g_iLeaderKillBonus = clamp(str_to_num(value), 0, 100);
+			if (equal(key, "LEADER_DAMAGE_BONUS_ENABLED"))
+				g_bLeaderDamageBonusEnabled = bool:clamp(str_to_num(value), 0, 1);
+			if (equal(key, "LEADER_DAMAGE_BONUS_PERCENT"))
+				g_iLeaderDamageBonusPercent = clamp(str_to_num(value), 0, 300);
 		}
 		
 		case PLUGINS:
@@ -1040,7 +1138,7 @@ public bool:values(INIParser:handle, const key[], const value[])
 				copy(szTrackTitle, charsmax(szTrackTitle), aMusicData[0]);
 
 			trim(szTrackTitle);
-			if (!equal(szTrackTitle, "УКАЖИТЕ НАЗВАНИЕ ТРЕКА") && szTrackTitle[0])
+			if (!equal(szTrackTitle, "УКАЖИТЕ НАЗВАНИЕ ТРЕКА") && !equal(szTrackTitle, UNKNOWN_ARTIST_TITLE) && szTrackTitle[0])
 			{
 				NormalizeTrackTitle(szTrackTitle, charsmax(szTrackTitle));
 				TrieSetString(g_tMusicTitle, szMusicKey, szTrackTitle);
@@ -1060,6 +1158,7 @@ public bool:values(INIParser:handle, const key[], const value[])
 	return true;
 }
 
+// Парсит цвет кольца подсветки из строки R G B.
 stock ParseHighlightColor(const szValue[])
 {
 	new szColor[3][12];
@@ -1070,6 +1169,7 @@ stock ParseHighlightColor(const szValue[])
 		g_iHighlightColor[i] = clamp(str_to_num(szColor[i]), 0, 255);
 }
 
+// Парсит цвет glow-подсветки модели из строки R G B.
 stock ParseHighlightModelColor(const szValue[])
 {
 	new szColor[3][12];
@@ -1081,6 +1181,7 @@ stock ParseHighlightModelColor(const szValue[])
 }
 
 /*top 5*/
+// Сбрасывает статистику и рендер игрока при входе на сервер.
 public client_putinserver(id)
 {
 	// начальные значения зашедшему игроку
@@ -1090,6 +1191,7 @@ public client_putinserver(id)
 	ResetLeaderModelRendering(id);
 }
 
+// Сбрасывает лидера/рендер при выходе игрока.
 public client_disconnected(id)
 {
 	if (id == g_iWarmupLeader)
@@ -1098,6 +1200,7 @@ public client_disconnected(id)
 	ResetLeaderModelRendering(id);
 }
 
+// Накапливает урон атакующего и обновляет лидера после первого фрага.
 public CBasePlayer_TakeDamage(const pevVictim, pevInflictor, const pevAttacker, Float:flDamage, bitsDamageType)
 {
 	if(pevVictim == pevAttacker || !IsPlayer(pevAttacker) || (bitsDamageType & DMG_BLAST))
@@ -1114,6 +1217,7 @@ public CBasePlayer_TakeDamage(const pevVictim, pevInflictor, const pevAttacker, 
 	return HC_CONTINUE;
 }
 
+// Готовит топ игроков по урону/киллам и запускает показ результатов.
 public fnCompareDamage()
 {
 	new iPlayers[MAX_PLAYERS], iNum, iPlayer;
@@ -1135,6 +1239,8 @@ public fnCompareDamage()
 	
 	// сортировка массива
 	SortCustom2D(g_arrData, sizeof(g_arrData), "SortRoundDamage");
+	remove_task(TASK_HIGHLIGHT_LEADER);
+	ResetWarmupLeaderModelRendering();
 	FreezePlayersBeforeWarmupResults();
 
 	client_cmd(0, "spk sound/events/task_complete.wav");
@@ -1143,6 +1249,7 @@ public fnCompareDamage()
 }
 
 
+// Замораживает игроков перед выводом итогов разминки.
 stock FreezePlayersBeforeWarmupResults()
 {
 	new iPlayers[MAX_PLAYERS], iNum;
@@ -1159,6 +1266,7 @@ stock FreezePlayersBeforeWarmupResults()
 	}
 }
 
+// Накладывает затемнение экрана игроку во время итогов.
 stock ShowWarmupResultFade(id)
 {
 	if (!g_iMsgScreenFade || g_iWarmupResultsFadeAlpha <= 0)
@@ -1175,6 +1283,7 @@ stock ShowWarmupResultFade(id)
 	message_end();
 }
 
+// Снимает затемнение экрана у игрока.
 stock ClearWarmupResultFade(id)
 {
 	if (!g_iMsgScreenFade)
@@ -1191,6 +1300,7 @@ stock ClearWarmupResultFade(id)
 	message_end();
 }
 
+// Размораживает игроков и очищает fade после итогов.
 stock UnfreezePlayersAfterWarmupResults()
 {
 	new iPlayers[MAX_PLAYERS], iNum;
@@ -1205,12 +1315,14 @@ stock UnfreezePlayersAfterWarmupResults()
 }
 
 // функция сравнения для сортировки
+// Функция сортировки игроков по урону (по убыванию).
 public SortRoundDamage(const elem1[], const elem2[])
 {
 	// сравнение дамага
 	return (elem1[DAMAGE] < elem2[DAMAGE]) ? 1 : (elem1[DAMAGE] > elem2[DAMAGE]) ? -1 : 0;
 }
 
+// Выдает денежные награды игрокам после рестарта раунда.
 public CSGameRules_RestartRound_Post()
 {
 	if (g_bWarmupRestartPending)
@@ -1235,6 +1347,7 @@ public CSGameRules_RestartRound_Post()
 	}
 }
 
+// Пошагово выводит DHUD-таблицу победителей разминки и завершает warmup.
 public ShowStats()
 {
 	if (g_iPlayerTop >= g_iTopPlayersCount || g_iPlayerTop >= sizeof(g_arrData))
@@ -1396,10 +1509,12 @@ public ShowStats()
 }
 
 //	Очистка DHUD сообщений
+// Очищает все каналы DHUD сообщений.
 stock ClearDHUDMessages()
         for (new iDHUD = 0; iDHUD < 8; iDHUD++)
                 show_dhudmessage(0, ""); 
 
+// Сбрасывает рендер игрока к стандартному виду.
 stock ResetLeaderModelRendering(id)
 {
 	if (!IsPlayer(id) || !is_user_connected(id))
@@ -1408,6 +1523,7 @@ stock ResetLeaderModelRendering(id)
 	set_user_rendering(id);
 }
 
+// Сбрасывает рендер у всех игроков на сервере.
 stock ResetWarmupLeaderModelRendering()
 {
 	new iPlayers[MAX_PLAYERS], iNum;
