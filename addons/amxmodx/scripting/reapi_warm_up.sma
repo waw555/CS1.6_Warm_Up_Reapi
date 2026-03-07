@@ -1,5 +1,6 @@
 #include <amxmisc>
 #include <fakemeta>
+#include <fun>
 #include <reapi>
 
 #define PLUGIN "[ReAPI] Warm UP"
@@ -110,10 +111,12 @@ new g_iRingSprite;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
 new bool:g_bHighlightEnabled = true;
+new bool:g_bHighlightModelEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new Float:g_flHighlightRadius = 85.0;
 new Float:g_flHighlightHeight = 0.0;
 new g_iHighlightColor[3] = {255, 0, 0};
+new g_iHighlightModelColor[3] = {255, 0, 0};
 new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
 new bool:g_bWarmupRestartPending;
@@ -252,6 +255,7 @@ public CSGameRules_CheckMapConditions()
 	{
 		set_task(g_flHighlightInterval, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
 	}
+	ResetWarmupLeaderModelRendering();
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
 	g_bWarmupRestartPending = false;
@@ -363,6 +367,7 @@ public Task_HighlightWarmupLeader()
 stock HighlightWarmupLeader()
 {
 	static bool:bPulseExpand;
+	new iPrevLeader = g_iWarmupLeader;
 
 	new iLeader = g_iWarmupLeader;
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
@@ -374,6 +379,25 @@ stock HighlightWarmupLeader()
 	}
 
 	g_iWarmupLeader = iLeader;
+	if (iPrevLeader != iLeader)
+		ResetLeaderModelRendering(iPrevLeader);
+
+	if (g_bHighlightModelEnabled)
+	{
+		set_user_rendering(
+			iLeader,
+			kRenderFxGlowShell,
+			g_iHighlightModelColor[0],
+			g_iHighlightModelColor[1],
+			g_iHighlightModelColor[2],
+			kRenderNormal,
+			16
+		);
+	}
+	else
+	{
+		ResetLeaderModelRendering(iLeader);
+	}
 
 	new Float:vecOrigin[3], Float:vecRingCenter[3], Float:flPulseRadius;
 	get_entvar(iLeader, var_origin, vecOrigin);
@@ -938,6 +962,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				copy(g_szWarmUpTimeMode, charsmax(g_szWarmUpTimeMode), value);
 			if (equal(key, "HIGHLIGHT_ENABLED"))
 				g_bHighlightEnabled = bool:clamp(str_to_num(value), 0, 1);
+			if (equal(key, "HIGHLIGHT_MODEL_ENABLED"))
+				g_bHighlightModelEnabled = bool:clamp(str_to_num(value), 0, 1);
 			if (equal(key, "HIGHLIGHT_INTERVAL"))
 				g_flHighlightInterval = floatclamp(str_to_float(value), 0.1, 5.0);
 			if (equal(key, "HIGHLIGHT_RADIUS"))
@@ -946,6 +972,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				g_flHighlightHeight = floatclamp(str_to_float(value), -100.0, 100.0);
 			if (equal(key, "HIGHLIGHT_COLOR"))
 				ParseHighlightColor(value);
+			if (equal(key, "HIGHLIGHT_MODEL_COLOR"))
+				ParseHighlightModelColor(value);
 			if (equal(key, "RESULTS_FADE_ALPHA"))
 				g_iWarmupResultsFadeAlpha = clamp(str_to_num(value), 0, 255);
 		}
@@ -1035,6 +1063,16 @@ stock ParseHighlightColor(const szValue[])
 		g_iHighlightColor[i] = clamp(str_to_num(szColor[i]), 0, 255);
 }
 
+stock ParseHighlightModelColor(const szValue[])
+{
+	new szColor[3][12];
+	if (explode_string(szValue, " ", szColor, sizeof(szColor), charsmax(szColor[])) < 3)
+		return;
+
+	for (new i; i < sizeof(g_iHighlightModelColor); i++)
+		g_iHighlightModelColor[i] = clamp(str_to_num(szColor[i]), 0, 255);
+}
+
 /*top 5*/
 public client_putinserver(id)
 {
@@ -1042,6 +1080,15 @@ public client_putinserver(id)
 	g_iPlayerDmg[id] = 0;
 	g_iPlayerKills[id] = 0;
 	g_iPlayerAward[id] = 0;
+	ResetLeaderModelRendering(id);
+}
+
+public client_disconnected(id)
+{
+	if (id == g_iWarmupLeader)
+		g_iWarmupLeader = 0;
+
+	ResetLeaderModelRendering(id);
 }
 
 public CBasePlayer_TakeDamage(const pevVictim, pevInflictor, const pevAttacker, Float:flDamage, bitsDamageType)
@@ -1187,6 +1234,7 @@ public ShowStats()
 	{
 		remove_task(0);
 		remove_task(TASK_HIGHLIGHT_LEADER);
+		ResetWarmupLeaderModelRendering();
 		UnfreezePlayersAfterWarmupResults();
 		g_bFirstKillHappened = false;
 		g_iWarmupLeader = 0;
@@ -1269,6 +1317,7 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
+			ResetWarmupLeaderModelRendering();
 			g_bWarmupRestartPending = true;
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
@@ -1304,6 +1353,7 @@ public ShowStats()
 		{
 			remove_task(0);
 			remove_task(TASK_HIGHLIGHT_LEADER);
+			ResetWarmupLeaderModelRendering();
 			g_bWarmupRestartPending = true;
 			g_bFirstKillHappened = false;
 			g_iWarmupLeader = 0;
@@ -1342,3 +1392,20 @@ public ShowStats()
 stock ClearDHUDMessages()
         for (new iDHUD = 0; iDHUD < 8; iDHUD++)
                 show_dhudmessage(0, ""); 
+
+stock ResetLeaderModelRendering(id)
+{
+	if (!IsPlayer(id) || !is_user_connected(id))
+		return;
+
+	set_user_rendering(id);
+}
+
+stock ResetWarmupLeaderModelRendering()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "ch");
+
+	for (new i; i < iNum; i++)
+		ResetLeaderModelRendering(iPlayers[i]);
+}
