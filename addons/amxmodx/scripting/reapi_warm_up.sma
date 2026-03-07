@@ -314,13 +314,19 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 	if (bLeaderKilled)
 	{
 		if (g_bLeaderKillBonusEnabled && g_iLeaderKillBonus > 0)
+		{
+			g_iPlayerKills[Victim] = max(g_iPlayerKills[Victim] - g_iLeaderKillBonus, 0);
 			g_iPlayerKills[Attacker] += g_iLeaderKillBonus;
+		}
 
 		if (g_bLeaderDamageBonusEnabled && g_iLeaderDamageBonusPercent > 0)
 		{
 			new iDamageBonus = floatround(float(g_iPlayerDmg[Victim]) * (float(g_iLeaderDamageBonusPercent) / 100.0));
 			if (iDamageBonus > 0)
+			{
+				g_iPlayerDmg[Victim] = max(g_iPlayerDmg[Victim] - iDamageBonus, 0);
 				g_iPlayerDmg[Attacker] += iDamageBonus;
+			}
 		}
 	}
 
