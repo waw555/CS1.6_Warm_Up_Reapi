@@ -850,6 +850,39 @@ stock GetDefaultMusicDuration()
 	return 60;
 }
 
+stock NormalizeMusicFolderPath(szPath[], iLen)
+{
+	trim(szPath);
+
+	new iLastChar = strlen(szPath) - 1;
+	if (iLastChar > 0)
+	{
+		if ((szPath[0] == '"' && szPath[iLastChar] == '"') || (szPath[0] == '\'' && szPath[iLastChar] == '\''))
+		{
+			szPath[iLastChar] = '^0';
+			copy(szPath, iLen, szPath[1]);
+			trim(szPath);
+		}
+	}
+
+	replace_all(szPath, iLen, "\\", "/");
+
+	while (equali(szPath, "sound/", 6))
+		copy(szPath, iLen, szPath[6]);
+
+	while (szPath[0] == '/')
+		copy(szPath, iLen, szPath[1]);
+
+	new iPathLen = strlen(szPath);
+	while (iPathLen > 0 && szPath[iPathLen - 1] == '/')
+	{
+		szPath[--iPathLen] = '^0';
+	}
+
+	if (!szPath[0])
+		copy(szPath, iLen, "ms/Warm_Up");
+}
+
 ReadConfig()
 {
 	get_localinfo("amxx_basedir", g_szWarmUpConfigPath, charsmax(g_szWarmUpConfigPath));
@@ -919,7 +952,10 @@ public bool:values(INIParser:handle, const key[], const value[])
 			if (equal(key, "PAUSE_STATS"))
 				g_pCvar[PAUSE_STATS] = str_to_num(value);
 			if (equal(key, "MUSIC_FOLDER"))
+			{
 				copy(g_szWarmUpMusicDir, charsmax(g_szWarmUpMusicDir), value);
+				NormalizeMusicFolderPath(g_szWarmUpMusicDir, charsmax(g_szWarmUpMusicDir));
+			}
 			if (equal(key, "WARMUP_TIME"))
 				copy(g_szWarmUpTimeMode, charsmax(g_szWarmUpTimeMode), value);
 			if (equal(key, "HIGHLIGHT_ENABLED"))
