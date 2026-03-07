@@ -843,13 +843,20 @@ stock NormalizeTrackTitle(szTrack[], iLen)
 
 stock bool:IsLikelyReadableTitle(const szText[])
 {
+	new bool:bHasReadableChars;
+
 	for (new i; szText[i] != '^0'; i++)
 	{
-		if (szText[i] < 32)
+		new iChar = szText[i];
+
+		if (iChar < 32 || iChar > 126)
 			return false;
+
+		if ((iChar >= '0' && iChar <= '9') || (iChar >= 'A' && iChar <= 'Z') || (iChar >= 'a' && iChar <= 'z'))
+			bHasReadableChars = true;
 	}
 
-	return true;
+	return bHasReadableChars;
 }
 
 stock ClampWarmTime(iTime)
