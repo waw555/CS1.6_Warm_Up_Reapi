@@ -308,10 +308,10 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 		return;
 
 	new iLeaderBeforeKill = g_iWarmupLeader;
-	if (!IsPlayer(iLeaderBeforeKill) || !is_user_connected(iLeaderBeforeKill))
-		iLeaderBeforeKill = GetWarmupLeaderByStats();
+	new bool:bLeaderExists = IsPlayer(iLeaderBeforeKill) && is_user_connected(iLeaderBeforeKill);
+	new bool:bLeaderKilled = bLeaderExists && (Victim == iLeaderBeforeKill);
 
-	if (Victim == iLeaderBeforeKill)
+	if (bLeaderKilled)
 	{
 		if (g_bLeaderKillBonusEnabled && g_iLeaderKillBonus > 0)
 			g_iPlayerKills[Attacker] += g_iLeaderKillBonus;
@@ -326,7 +326,9 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 
 	g_iPlayerKills[Attacker]++;
 	g_bFirstKillHappened = true;
-	g_iWarmupLeader = GetWarmupLeaderByStats();
+
+	if (!bLeaderExists || bLeaderKilled)
+		g_iWarmupLeader = Attacker;
 
 	new pWeapon = get_member(Attacker, m_pActiveItem);
 	if (is_nullent(pWeapon) || ~CSW_ALL_GUNS & 1 << get_member(pWeapon, m_iId))
@@ -410,9 +412,6 @@ stock HighlightWarmupLeader()
 
 	new iLeader = g_iWarmupLeader;
 	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
-		iLeader = GetWarmupLeaderByStats();
-
-	if (!IsPlayer(iLeader) || !is_user_alive(iLeader))
 	{
 		if (IsPlayer(iPrevLeader))
 			ResetLeaderModelRendering(iPrevLeader);
@@ -473,30 +472,6 @@ stock HighlightWarmupLeader()
 	write_byte(0);
 	message_end();
 }
-
-// Выбирает одного лидера по киллам, затем по урону и id.
-stock GetWarmupLeaderByStats()
-{
-	new iLeader, iMaxDamage = -1, iMaxKills = -1;
-
-	for (new id = 1; id <= g_iMaxPlayers; id++)
-	{
-		if (!is_user_connected(id))
-			continue;
-
-		if (g_iPlayerKills[id] > iMaxKills
-		|| (g_iPlayerKills[id] == iMaxKills && g_iPlayerDmg[id] > iMaxDamage)
-		|| (g_iPlayerKills[id] == iMaxKills && g_iPlayerDmg[id] == iMaxDamage && (!iLeader || id < iLeader)))
-		{
-			iMaxDamage = g_iPlayerDmg[id];
-			iMaxKills = g_iPlayerKills[id];
-			iLeader = id;
-		}
-	}
-
-	return iLeader;
-}
-
 // Выполняет принудительный рестарт раунда и останавливает музыку.
 @restart() 
 {
@@ -1231,19 +1206,14 @@ public client_disconnected(id)
 	ResetLeaderModelRendering(id);
 }
 
-// Накапливает урон атакующего и обновляет лидера после первого фрага.
+// Накапливает урон атакующего.
 public CBasePlayer_TakeDamage(const pevVictim, pevInflictor, const pevAttacker, Float:flDamage, bitsDamageType)
 {
 	if(pevVictim == pevAttacker || !IsPlayer(pevAttacker) || (bitsDamageType & DMG_BLAST))
 		return HC_CONTINUE;
 	
 	if(rg_is_player_can_takedamage(pevVictim, pevAttacker))
-	{
 		g_iPlayerDmg[pevAttacker] += floatround(flDamage);
-
-		if (g_bFirstKillHappened)
-			g_iWarmupLeader = GetWarmupLeaderByStats();
-	}
 	
 	return HC_CONTINUE;
 }
