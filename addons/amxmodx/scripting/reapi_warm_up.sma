@@ -175,6 +175,13 @@ public event_game_commencing()
 public CSGameRules_CheckMapConditions()
 {
 	DisableHookChain(g_hCheckMapConditions);
+
+	new iWarmModesCount = ArraySize(g_aWarm);
+	if (iWarmModesCount <= 0)
+	{
+		log_amx("[ReAPI] Warm Up: no WEAPS entries loaded from %s. Warmup start aborted.", g_szWarmUpConfigPath);
+		return;
+	}
 	
 	EnableHookChain(g_hDropPlayerItem);
 	EnableHookChain(g_hOnSpawnEquip);
@@ -197,7 +204,7 @@ public CSGameRules_CheckMapConditions()
 	}
 	
 	new aWarm[WARM_STRUCT];
-	ArrayGetArray(g_aWarm, random(ArraySize(g_aWarm)), aWarm);
+	ArrayGetArray(g_aWarm, random(iWarmModesCount), aWarm);
 	
 	// 
 	set_cvar_num("mp_free_armor", aWarm[KEVLAR]);
