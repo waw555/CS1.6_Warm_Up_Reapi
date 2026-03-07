@@ -112,7 +112,7 @@ new g_iWarmupLeader;
 new bool:g_bHighlightEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new Float:g_flHighlightRadius = 85.0;
-new Float:g_flHighlightHeight = 85.0;
+new Float:g_flHighlightHeight = 0.0;
 new g_iHighlightColor[3] = {255, 0, 0};
 new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
@@ -382,9 +382,9 @@ stock HighlightWarmupLeader()
 	engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
 	engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
 	engfunc(EngFunc_WriteCoord, vecRingCenter[2]);
-	engfunc(EngFunc_WriteCoord, vecRingCenter[0] + flPulseRadius);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
 	engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
-	engfunc(EngFunc_WriteCoord, vecRingCenter[2]);
+	engfunc(EngFunc_WriteCoord, vecRingCenter[2] + flPulseRadius);
 	write_short(g_iRingSprite);
 	write_byte(0);
 	write_byte(0);
@@ -929,7 +929,7 @@ public bool:values(INIParser:handle, const key[], const value[])
 			if (equal(key, "HIGHLIGHT_RADIUS"))
 				g_flHighlightRadius = floatclamp(str_to_float(value), 10.0, 500.0);
 			if (equal(key, "HIGHLIGHT_HEIGHT"))
-				g_flHighlightHeight = floatclamp(str_to_float(value), 10.0, 500.0);
+				g_flHighlightHeight = floatclamp(str_to_float(value), -100.0, 100.0);
 			if (equal(key, "HIGHLIGHT_COLOR"))
 				ParseHighlightColor(value);
 			if (equal(key, "RESULTS_FADE_ALPHA"))
