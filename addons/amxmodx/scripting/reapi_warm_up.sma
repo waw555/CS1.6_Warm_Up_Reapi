@@ -120,6 +120,7 @@ new g_iHighlightModelColor[3] = {255, 0, 0};
 new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
 new bool:g_bWarmupRestartPending;
+new bool:g_bWarmupCompleted;
 new bool:g_bLeaderKillBonusEnabled = true;
 new g_iLeaderKillBonus = 1;
 new bool:g_bLeaderDamageBonusEnabled = true;
@@ -176,7 +177,8 @@ public plugin_init()
 // Разблокирует условия карты и сбрасывает флаг m_bNotKilled живым игрокам.
 public event_game_commencing()
 {
-	EnableHookChain(g_hCheckMapConditions);
+	if (!g_bWarmupCompleted)
+		EnableHookChain(g_hCheckMapConditions);
 	
 	//
 	for (new i = MaxClients; i > 0; --i)
@@ -188,6 +190,9 @@ public event_game_commencing()
 public CSGameRules_CheckMapConditions()
 {
 	DisableHookChain(g_hCheckMapConditions);
+
+	if (g_bWarmupCompleted)
+		return;
 
 	new iWarmModesCount = ArraySize(g_aWarm);
 	if (iWarmModesCount <= 0)
@@ -946,22 +951,39 @@ stock CreateDefaultConfigFile()
 		";",
 		"; Некоторые настройки самой системы",
 		"[VARIABLES]",
+		"; RESTART - количество рестартов после разминки",
 		"	RESTART = 1",
+		"; AUTO_AMMO - автоперезарядка после убийства (0/1)",
 		"	AUTO_AMMO = 1",
+		"; PAUSE_STATS - пауза csstats/aes на время разминки (0/1)",
 		"	PAUSE_STATS = 1",
+		"; MUSIC_FOLDER - папка с mp3 в sound/",
 		"	MUSIC_FOLDER = ms/Warm_Up",
+		"; WARMUP_TIME - AUTO или число секунд (10..90)",
 		"	WARMUP_TIME = AUTO",
+		"; HIGHLIGHT_ENABLED - включить подсветку лидера (0/1)",
 		"	HIGHLIGHT_ENABLED = 1",
+		"; HIGHLIGHT_MODEL_ENABLED - glow на модели лидера (0/1)",
 		"	HIGHLIGHT_MODEL_ENABLED = 1",
+		"; HIGHLIGHT_INTERVAL - интервал подсветки лидера (0.1..5.0)",
 		"	HIGHLIGHT_INTERVAL = 5.0",
+		"; HIGHLIGHT_RADIUS - радиус кольца подсветки",
 		"	HIGHLIGHT_RADIUS = 100.0",
+		"; HIGHLIGHT_HEIGHT - смещение кольца по высоте",
 		"	HIGHLIGHT_HEIGHT = 0.0",
+		"; HIGHLIGHT_COLOR - цвет кольца (R G B)",
 		"	HIGHLIGHT_COLOR = 0 255 0",
+		"; HIGHLIGHT_MODEL_COLOR - цвет glow модели (R G B)",
 		"	HIGHLIGHT_MODEL_COLOR = 255 0 0",
+		"; RESULTS_FADE_ALPHA - затемнение экрана при итогах (0..255)",
 		"	RESULTS_FADE_ALPHA = 180",
+		"; LEADER_KILL_BONUS_ENABLED - бонус киллов за убийство лидера (0/1)",
 		"	LEADER_KILL_BONUS_ENABLED = 1",
+		"; LEADER_KILL_BONUS - сколько доп.киллов начислить",
 		"	LEADER_KILL_BONUS = 1",
+		"; LEADER_DAMAGE_BONUS_ENABLED - бонус урона за убийство лидера (0/1)",
 		"	LEADER_DAMAGE_BONUS_ENABLED = 1",
+		"; LEADER_DAMAGE_BONUS_PERCENT - процент урона лидера, который начисляется убийце",
 		"	LEADER_DAMAGE_BONUS_PERCENT = 50",
 		"",
 		"[PLUGINS]",
@@ -1352,14 +1374,7 @@ public ShowStats()
 {
 	if (g_iPlayerTop >= g_iTopPlayersCount || g_iPlayerTop >= sizeof(g_arrData))
 	{
-		remove_task(0);
-		remove_task(TASK_HIGHLIGHT_LEADER);
-		ResetWarmupLeaderModelRendering();
-		UnfreezePlayersAfterWarmupResults();
-		g_bFirstKillHappened = false;
-		g_iWarmupLeader = 0;
-		g_iCounter = 0;
-		g_iPlayerTop = 0;
+		FinishWarmupAndRestart();
 		return;
 	}
 
@@ -1435,77 +1450,50 @@ public ShowStats()
 		}
 		case 16:
 		{
-			remove_task(0);
-			remove_task(TASK_HIGHLIGHT_LEADER);
-			ResetWarmupLeaderModelRendering();
-			g_bWarmupRestartPending = true;
-			g_bFirstKillHappened = false;
-			g_iWarmupLeader = 0;
-			g_iCounter = 0;
-			g_iPlayerTop = 0;
-			DisableHookChain(g_hDropPlayerItem);
-			DisableHookChain(g_hOnSpawnEquip);
-			
-			if (g_pCvar[AUTO_AMMO])
-				DisableHookChain(g_hKilled);
-			
-			//
-			for (new i; i < sizeof(g_eCvarsToDisable); i++) {
-				set_pcvar_string(get_cvar_pointer(g_eCvarsToDisable[i][0]), g_pDefaultCvars[i]);
-			}
-			
-			if (g_pCvar[PAUSE_STATS])
-			{
-				set_cvar_num("csstats_pause", 0);
-				set_cvar_num("aes_track_pause", 0);
-			}
-			
-			for (new i; i < ArraySize(g_aPlugins); i++)
-			unpause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
-				
-			ClearDHUDMessages();
-			
-			set_cvar_num("sv_restart", 1);
-			set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
-			client_cmd(0, "stopsound; mp3 stop");
+			FinishWarmupAndRestart();
 		}
 		default:
 		{
-			remove_task(0);
-			remove_task(TASK_HIGHLIGHT_LEADER);
-			ResetWarmupLeaderModelRendering();
-			g_bWarmupRestartPending = true;
-			g_bFirstKillHappened = false;
-			g_iWarmupLeader = 0;
-			g_iCounter = 0;
-			g_iPlayerTop = 0;
-			DisableHookChain(g_hDropPlayerItem);
-			DisableHookChain(g_hOnSpawnEquip);
-			
-			if (g_pCvar[AUTO_AMMO])
-				DisableHookChain(g_hKilled);
-			
-			//
-			for (new i; i < sizeof(g_eCvarsToDisable); i++) {
-				set_pcvar_string(get_cvar_pointer(g_eCvarsToDisable[i][0]), g_pDefaultCvars[i]);
-			}
-			
-			if (g_pCvar[PAUSE_STATS])
-			{
-				set_cvar_num("csstats_pause", 0);
-				set_cvar_num("aes_track_pause", 0);
-			}
-			
-			for (new i; i < ArraySize(g_aPlugins); i++)
-			unpause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
-				
-			ClearDHUDMessages();
-			
-			set_cvar_num("sv_restart", 1);
-			set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
-			client_cmd(0, "stopsound; mp3 stop");
+			FinishWarmupAndRestart();
 		}
 	}
+}
+
+stock FinishWarmupAndRestart()
+{
+	remove_task(0);
+	remove_task(TASK_HIGHLIGHT_LEADER);
+	ResetWarmupLeaderModelRendering();
+	UnfreezePlayersAfterWarmupResults();
+	g_bWarmupRestartPending = true;
+	g_bWarmupCompleted = true;
+	g_bFirstKillHappened = false;
+	g_iWarmupLeader = 0;
+	g_iCounter = 0;
+	g_iPlayerTop = 0;
+	DisableHookChain(g_hDropPlayerItem);
+	DisableHookChain(g_hOnSpawnEquip);
+
+	if (g_pCvar[AUTO_AMMO])
+		DisableHookChain(g_hKilled);
+
+	for (new i; i < sizeof(g_eCvarsToDisable); i++)
+		set_pcvar_string(get_cvar_pointer(g_eCvarsToDisable[i][0]), g_pDefaultCvars[i]);
+
+	if (g_pCvar[PAUSE_STATS])
+	{
+		set_cvar_num("csstats_pause", 0);
+		set_cvar_num("aes_track_pause", 0);
+	}
+
+	for (new i; i < ArraySize(g_aPlugins); i++)
+		unpause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
+
+	ClearDHUDMessages();
+
+	set_cvar_num("sv_restart", 1);
+	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
+	client_cmd(0, "stopsound; mp3 stop");
 }
 
 //	Очистка DHUD сообщений
