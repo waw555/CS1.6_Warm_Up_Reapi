@@ -407,7 +407,7 @@ stock ShowLeaderRewardHud(Float:flStartY)
 	show_dhudmessage(0, "ЛИДЕР - %s", szLeaderName);
 
 	set_dhudmessage(.red = 255, .green = 200, .blue = 0, .x = -1.0, .y = flStartY + 0.03, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
-	show_dhudmessage(0, "НАГРАДА - %d%% ОТ УРОНА ЛИДЕРА", g_bLeaderDamageBonusEnabled ? g_iLeaderDamageBonusPercent : 0);
+	show_dhudmessage(0, "НАГРАДА ЗА УБИЙСТВО - %d%%", g_bLeaderDamageBonusEnabled ? g_iLeaderDamageBonusPercent : 0);
 }
 
 // Периодически запускает подсветку лидера после первого убийства.
