@@ -122,8 +122,6 @@ new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
 new bool:g_bWarmupRestartPending;
 new bool:g_bWarmupCompleted;
-new bool:g_bLeaderKillBonusEnabled = true;
-new g_iLeaderKillBonus = 1;
 new bool:g_bLeaderDamageBonusEnabled = true;
 new g_iLeaderDamageBonusPercent = 50;
 
@@ -313,12 +311,6 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 
 	if (bLeaderKilled)
 	{
-		if (g_bLeaderKillBonusEnabled && g_iLeaderKillBonus > 0)
-		{
-			g_iPlayerKills[Victim] = max(g_iPlayerKills[Victim] - g_iLeaderKillBonus, 0);
-			g_iPlayerKills[Attacker] += g_iLeaderKillBonus;
-		}
-
 		if (g_bLeaderDamageBonusEnabled && g_iLeaderDamageBonusPercent > 0)
 		{
 			new iDamageBonus = floatround(float(g_iPlayerDmg[Victim]) * (float(g_iLeaderDamageBonusPercent) / 100.0));
@@ -391,14 +383,31 @@ public Show_Timer()
 		if(!g_szWarmUpTrack[0] || g_iWarmUpTrackTime <= 0){
 			set_dhudmessage( .red = 0, .green = 255, .blue = 0, .x = -1.0, .y = 0.04, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
 			show_dhudmessage(0, "РАЗМИНКА ЗАКОНЧИТСЯ ЧЕРЕЗ %i СЕК", g_iCountDown);
+			ShowLeaderRewardHud(0.07);
 		}else{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.04, .effects = 0, .fxtime = 0.0, .holdtime = 1.1, .fadeintime = 0.0, .fadeouttime = 0.0);
 			show_dhudmessage(0, "СЕЙЧАС ИГРАЕТ: %s", g_szWarmUpTrack);
 			set_dhudmessage( .red = 0, .green = 255, .blue = 0, .x = -1.0, .y = 0.07, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
 			show_dhudmessage(0, "РАЗМИНКА ЗАКОНЧИТСЯ ЧЕРЕЗ %i СЕК", g_iCountDown);
+			ShowLeaderRewardHud(0.10);
 		}
 
 	}
+}
+
+stock ShowLeaderRewardHud(Float:flStartY)
+{
+	if (!IsPlayer(g_iWarmupLeader) || !is_user_connected(g_iWarmupLeader))
+		return;
+
+	new szLeaderName[MAX_NAME_LENGTH];
+	get_user_name(g_iWarmupLeader, szLeaderName, charsmax(szLeaderName));
+
+	set_dhudmessage(.red = 255, .green = 255, .blue = 0, .x = -1.0, .y = flStartY, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
+	show_dhudmessage(0, "ЛИДЕР - %s", szLeaderName);
+
+	set_dhudmessage(.red = 255, .green = 200, .blue = 0, .x = -1.0, .y = flStartY + 0.03, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
+	show_dhudmessage(0, "НАГРАДА - %d%% ОТ УРОНА ЛИДЕРА", g_bLeaderDamageBonusEnabled ? g_iLeaderDamageBonusPercent : 0);
 }
 
 // Периодически запускает подсветку лидера после первого убийства.
@@ -965,10 +974,6 @@ stock CreateDefaultConfigFile()
 		"	HIGHLIGHT_MODEL_COLOR = 255 0 0",
 		"; RESULTS_FADE_ALPHA - затемнение экрана при итогах (0..255)",
 		"	RESULTS_FADE_ALPHA = 180",
-		"; LEADER_KILL_BONUS_ENABLED - бонус киллов за убийство лидера (0/1)",
-		"	LEADER_KILL_BONUS_ENABLED = 1",
-		"; LEADER_KILL_BONUS - сколько доп.киллов начислить",
-		"	LEADER_KILL_BONUS = 1",
 		"; LEADER_DAMAGE_BONUS_ENABLED - бонус урона за убийство лидера (0/1)",
 		"	LEADER_DAMAGE_BONUS_ENABLED = 1",
 		"; LEADER_DAMAGE_BONUS_PERCENT - процент урона лидера, который начисляется убийце",
@@ -1083,10 +1088,6 @@ public bool:values(INIParser:handle, const key[], const value[])
 				ParseHighlightModelColor(value);
 			if (equal(key, "RESULTS_FADE_ALPHA"))
 				g_iWarmupResultsFadeAlpha = clamp(str_to_num(value), 0, 255);
-			if (equal(key, "LEADER_KILL_BONUS_ENABLED"))
-				g_bLeaderKillBonusEnabled = bool:clamp(str_to_num(value), 0, 1);
-			if (equal(key, "LEADER_KILL_BONUS"))
-				g_iLeaderKillBonus = clamp(str_to_num(value), 0, 100);
 			if (equal(key, "LEADER_DAMAGE_BONUS_ENABLED"))
 				g_bLeaderDamageBonusEnabled = bool:clamp(str_to_num(value), 0, 1);
 			if (equal(key, "LEADER_DAMAGE_BONUS_PERCENT"))
