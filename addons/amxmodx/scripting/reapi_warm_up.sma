@@ -122,8 +122,11 @@ new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
 new bool:g_bWarmupRestartPending;
 new bool:g_bWarmupCompleted;
-new bool:g_bLeaderDamageBonusEnabled = true;
-new g_iLeaderDamageBonusPercent = 50;
+new bool:g_bLeaderModeEnabled = true;
+new g_iLeaderKillRewardStart = 300;
+new g_iLeaderKillRewardStep = 100;
+new g_iLeaderRewardGrowByLeaderKill = 50;
+new g_iCurrentLeaderKillReward;
 
 new const UNKNOWN_ARTIST_TITLE[] = "НЕИЗВЕСТНЫЙ ИСПОЛНИТЕЛЬ";
 
@@ -265,7 +268,7 @@ public CSGameRules_CheckMapConditions()
 	
 	//
 	set_task(1.0, "Show_Timer", .flags = "b");
-	if (g_bHighlightEnabled)
+	if (g_bLeaderModeEnabled && g_bHighlightEnabled)
 	{
 		set_task(g_flHighlightInterval, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
 	}
@@ -273,6 +276,7 @@ public CSGameRules_CheckMapConditions()
 	g_bFirstKillHappened = false;
 	g_iWarmupLeader = 0;
 	g_iHighlightedLeader = 0;
+	g_iCurrentLeaderKillReward = g_iLeaderKillRewardStart;
 	g_bWarmupRestartPending = false;
 	
 	// 
@@ -305,25 +309,34 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 	if(!is_user_connected(Victim) || !is_user_connected(Attacker) || Victim == Attacker || !IsPlayer(Attacker) || get_member(Victim, m_iTeam) == get_member(Attacker, m_iTeam) || get_member(Victim, m_bKilledByGrenade))
 		return;
 
+	if (!g_bLeaderModeEnabled)
+	{
+		g_iPlayerKills[Attacker]++;
+		g_bFirstKillHappened = true;
+		return;
+	}
+
 	new iLeaderBeforeKill = g_iWarmupLeader;
 	new bool:bLeaderExists = IsPlayer(iLeaderBeforeKill) && is_user_connected(iLeaderBeforeKill);
 	new bool:bLeaderKilled = bLeaderExists && (Victim == iLeaderBeforeKill);
 
-	if (bLeaderKilled)
-	{
-		if (g_bLeaderDamageBonusEnabled && g_iLeaderDamageBonusPercent > 0)
-		{
-			new iDamageBonus = floatround(float(g_iPlayerDmg[Victim]) * (float(g_iLeaderDamageBonusPercent) / 100.0));
-			if (iDamageBonus > 0)
-			{
-				g_iPlayerDmg[Victim] = max(g_iPlayerDmg[Victim] - iDamageBonus, 0);
-				g_iPlayerDmg[Attacker] += iDamageBonus;
-			}
-		}
-	}
-
 	g_iPlayerKills[Attacker]++;
 	g_bFirstKillHappened = true;
+
+	if (bLeaderExists && Attacker == iLeaderBeforeKill && !bLeaderKilled)
+		g_iCurrentLeaderKillReward += g_iLeaderRewardGrowByLeaderKill;
+
+	if (bLeaderKilled)
+	{
+		new iLeaderReward = max(g_iCurrentLeaderKillReward, 0);
+		if (iLeaderReward > 0)
+		{
+			rg_add_account(Attacker, iLeaderReward, AS_ADD, true);
+			ShowLeaderKillReward(Attacker, iLeaderReward);
+		}
+
+		g_iCurrentLeaderKillReward += g_iLeaderKillRewardStep;
+	}
 
 	if (!bLeaderExists || bLeaderKilled)
 		g_iWarmupLeader = Attacker;
@@ -397,6 +410,9 @@ public Show_Timer()
 
 stock ShowLeaderRewardHud(Float:flStartY)
 {
+	if (!g_bLeaderModeEnabled)
+		return;
+
 	if (!IsPlayer(g_iWarmupLeader) || !is_user_connected(g_iWarmupLeader))
 		return;
 
@@ -407,12 +423,21 @@ stock ShowLeaderRewardHud(Float:flStartY)
 	show_dhudmessage(0, "ЛИДЕР - %s", szLeaderName);
 
 	set_dhudmessage(.red = 255, .green = 200, .blue = 0, .x = -1.0, .y = flStartY + 0.03, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
-	show_dhudmessage(0, "НАГРАДА ЗА УБИЙСТВО - %d%%", g_bLeaderDamageBonusEnabled ? g_iLeaderDamageBonusPercent : 0);
+	show_dhudmessage(0, "НАГРАДА ЗА УБИЙСТВО - %d$", max(g_iCurrentLeaderKillReward, 0));
+}
+
+stock ShowLeaderKillReward(id, iReward)
+{
+	set_hudmessage(0, 255, 0, 0.83, 0.86, 0, 0.0, 1.5, 0.0, 0.0, 3);
+	show_hudmessage(id, "+%d$ за убийство лидера", iReward);
 }
 
 // Периодически запускает подсветку лидера после первого убийства.
 public Task_HighlightWarmupLeader()
 {
+	if (!g_bLeaderModeEnabled || !g_bHighlightEnabled)
+		return;
+
 	if (!g_bFirstKillHappened)
 		return;
 
@@ -974,10 +999,14 @@ stock CreateDefaultConfigFile()
 		"	HIGHLIGHT_MODEL_COLOR = 255 0 0",
 		"; RESULTS_FADE_ALPHA - затемнение экрана при итогах (0..255)",
 		"	RESULTS_FADE_ALPHA = 180",
-		"; LEADER_DAMAGE_BONUS_ENABLED - бонус урона за убийство лидера (0/1)",
-		"	LEADER_DAMAGE_BONUS_ENABLED = 1",
-		"; LEADER_DAMAGE_BONUS_PERCENT - процент урона лидера, который начисляется убийце",
-		"	LEADER_DAMAGE_BONUS_PERCENT = 50",
+		"; LEADER_MODE_ENABLED - использовать режим с лидером (0/1)",
+		"	LEADER_MODE_ENABLED = 1",
+		"; LEADER_KILL_REWARD_START - стартовая награда в $ за убийство лидера",
+		"	LEADER_KILL_REWARD_START = 300",
+		"; LEADER_KILL_REWARD_STEP - увеличение награды после каждого убийства лидера",
+		"	LEADER_KILL_REWARD_STEP = 100",
+		"; LEADER_REWARD_GROW_BY_LEADER_KILL - рост награды, если лидер убивает игрока, пока он лидер",
+		"	LEADER_REWARD_GROW_BY_LEADER_KILL = 50",
 		"",
 		"[PLUGINS]",
 		"	Knife_Duel",
@@ -1088,10 +1117,14 @@ public bool:values(INIParser:handle, const key[], const value[])
 				ParseHighlightModelColor(value);
 			if (equal(key, "RESULTS_FADE_ALPHA"))
 				g_iWarmupResultsFadeAlpha = clamp(str_to_num(value), 0, 255);
-			if (equal(key, "LEADER_DAMAGE_BONUS_ENABLED"))
-				g_bLeaderDamageBonusEnabled = bool:clamp(str_to_num(value), 0, 1);
-			if (equal(key, "LEADER_DAMAGE_BONUS_PERCENT"))
-				g_iLeaderDamageBonusPercent = clamp(str_to_num(value), 0, 300);
+			if (equal(key, "LEADER_MODE_ENABLED"))
+				g_bLeaderModeEnabled = bool:clamp(str_to_num(value), 0, 1);
+			if (equal(key, "LEADER_KILL_REWARD_START"))
+				g_iLeaderKillRewardStart = clamp(str_to_num(value), 0, 16000);
+			if (equal(key, "LEADER_KILL_REWARD_STEP"))
+				g_iLeaderKillRewardStep = clamp(str_to_num(value), 0, 16000);
+			if (equal(key, "LEADER_REWARD_GROW_BY_LEADER_KILL"))
+				g_iLeaderRewardGrowByLeaderKill = clamp(str_to_num(value), 0, 16000);
 		}
 		
 		case PLUGINS:
@@ -1218,7 +1251,7 @@ public CBasePlayer_TakeDamage(const pevVictim, pevInflictor, const pevAttacker, 
 {
 	if(pevVictim == pevAttacker || !IsPlayer(pevAttacker) || (bitsDamageType & DMG_BLAST))
 		return HC_CONTINUE;
-	
+
 	if(rg_is_player_can_takedamage(pevVictim, pevAttacker))
 		g_iPlayerDmg[pevAttacker] += floatround(flDamage);
 	
@@ -1327,8 +1360,13 @@ stock UnfreezePlayersAfterWarmupResults()
 // Функция сортировки игроков по урону (по убыванию).
 public SortRoundDamage(const elem1[], const elem2[])
 {
-	// сравнение дамага
-	return (elem1[DAMAGE] < elem2[DAMAGE]) ? 1 : (elem1[DAMAGE] > elem2[DAMAGE]) ? -1 : 0;
+	if (elem1[KILLS] != elem2[KILLS])
+		return (elem1[KILLS] < elem2[KILLS]) ? 1 : -1;
+
+	if (elem1[DAMAGE] != elem2[DAMAGE])
+		return (elem1[DAMAGE] < elem2[DAMAGE]) ? 1 : -1;
+
+	return 0;
 }
 
 // Выдает денежные награды игрокам после рестарта раунда.
