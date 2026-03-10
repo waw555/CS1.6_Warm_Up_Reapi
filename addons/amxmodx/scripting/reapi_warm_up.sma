@@ -112,7 +112,7 @@ new g_iRingSprite;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
 new g_iHighlightedLeader;
-new bool:g_bHighlightEnabled = true;
+new bool:g_bHighlightRingEnabled = true;
 new bool:g_bHighlightModelEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new Float:g_flHighlightRadius = 85.0;
@@ -275,7 +275,7 @@ public CSGameRules_CheckMapConditions()
 	
 	//
 	set_task(1.0, "Show_Timer", .flags = "b");
-	if (g_bLeaderModeEnabled && g_bHighlightEnabled)
+	if (g_bLeaderModeEnabled && (g_bHighlightRingEnabled || g_bHighlightModelEnabled))
 	{
 		set_task(g_flHighlightInterval, "Task_HighlightWarmupLeader", TASK_HIGHLIGHT_LEADER, .flags = "b");
 	}
@@ -438,7 +438,7 @@ stock ResolveWarmupWeaponSprites(const szGunList[])
 
 	while (argbreak(szInput, szWeaponToken, charsmax(szWeaponToken), szInput, charsmax(szInput)) != -1)
 	{
-		if (!szWeaponToken[0] || equali(szWeaponToken, "knife"))
+		if (!szWeaponToken[0])
 			continue;
 
 		if (!WeaponTokenToSprite(szWeaponToken, szSprite, charsmax(szSprite)))
@@ -470,6 +470,7 @@ stock ResolveWarmupWeaponSprites(const szGunList[])
 
 stock bool:WeaponTokenToSprite(const szWeapon[], szSprite[], iSpriteLen)
 {
+	if (equali(szWeapon, "knife") || equali(szWeapon, "weapon_knife")) return bool:copy(szSprite, iSpriteLen, "d_knife");
 	if (equali(szWeapon, "glock18")) return bool:copy(szSprite, iSpriteLen, "d_glock18");
 	if (equali(szWeapon, "usp")) return bool:copy(szSprite, iSpriteLen, "d_usp");
 	if (equali(szWeapon, "p228")) return bool:copy(szSprite, iSpriteLen, "d_p228");
@@ -584,7 +585,7 @@ stock ShowLeaderRewardHud(Float:flStartY)
 // Периодически запускает подсветку лидера после первого убийства.
 public Task_HighlightWarmupLeader()
 {
-	if (!g_bLeaderModeEnabled || !g_bHighlightEnabled)
+	if (!g_bLeaderModeEnabled || (!g_bHighlightRingEnabled && !g_bHighlightModelEnabled))
 		return;
 
 	if (!g_bFirstKillHappened)
@@ -631,35 +632,38 @@ stock HighlightWarmupLeader()
 		ResetLeaderModelRendering(iLeader);
 	}
 
-	new Float:vecOrigin[3], Float:vecRingCenter[3], Float:flPulseRadius;
-	get_entvar(iLeader, var_origin, vecOrigin);
-	bPulseExpand = !bPulseExpand;
-	flPulseRadius = g_flHighlightRadius + (bPulseExpand ? (g_flHighlightRadius / 5.0) : 0.0);
+	if (g_bHighlightRingEnabled)
+	{
+		new Float:vecOrigin[3], Float:vecRingCenter[3], Float:flPulseRadius;
+		get_entvar(iLeader, var_origin, vecOrigin);
+		bPulseExpand = !bPulseExpand;
+		flPulseRadius = g_flHighlightRadius + (bPulseExpand ? (g_flHighlightRadius / 5.0) : 0.0);
 
-	vecRingCenter[0] = vecOrigin[0];
-	vecRingCenter[1] = vecOrigin[1];
-	vecRingCenter[2] = vecOrigin[2] + g_flHighlightHeight;
+		vecRingCenter[0] = vecOrigin[0];
+		vecRingCenter[1] = vecOrigin[1];
+		vecRingCenter[2] = vecOrigin[2] + g_flHighlightHeight;
 
-	message_begin(MSG_ALL, SVC_TEMPENTITY);
-	write_byte(TE_BEAMCYLINDER);
-	engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
-	engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
-	engfunc(EngFunc_WriteCoord, vecRingCenter[2]);
-	engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
-	engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
-	engfunc(EngFunc_WriteCoord, vecRingCenter[2] + flPulseRadius);
-	write_short(g_iRingSprite);
-	write_byte(0);
-	write_byte(0);
-	write_byte(8);
-	write_byte(20);
-	write_byte(0);
-	write_byte(g_iHighlightColor[0]);
-	write_byte(g_iHighlightColor[1]);
-	write_byte(g_iHighlightColor[2]);
-	write_byte(200);
-	write_byte(0);
-	message_end();
+		message_begin(MSG_ALL, SVC_TEMPENTITY);
+		write_byte(TE_BEAMCYLINDER);
+		engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
+		engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
+		engfunc(EngFunc_WriteCoord, vecRingCenter[2]);
+		engfunc(EngFunc_WriteCoord, vecRingCenter[0]);
+		engfunc(EngFunc_WriteCoord, vecRingCenter[1]);
+		engfunc(EngFunc_WriteCoord, vecRingCenter[2] + flPulseRadius);
+		write_short(g_iRingSprite);
+		write_byte(0);
+		write_byte(0);
+		write_byte(8);
+		write_byte(20);
+		write_byte(0);
+		write_byte(g_iHighlightColor[0]);
+		write_byte(g_iHighlightColor[1]);
+		write_byte(g_iHighlightColor[2]);
+		write_byte(200);
+		write_byte(0);
+		message_end();
+	}
 }
 // Выполняет принудительный рестарт раунда и останавливает музыку.
 @restart() 
@@ -1132,8 +1136,9 @@ stock CreateDefaultConfigFile()
 		"	MUSIC_FOLDER = ms/Warm_Up",
 		"; WARMUP_TIME - AUTO или число секунд (10..90)",
 		"	WARMUP_TIME = AUTO",
-		"; HIGHLIGHT_ENABLED - включить подсветку лидера (0/1)",
-		"	HIGHLIGHT_ENABLED = 1",
+		"; HIGHLIGHT_RING_ENABLED - включить кольцо подсветки лидера (0/1)",
+		"	HIGHLIGHT_RING_ENABLED = 1",
+		"; HIGHLIGHT_ENABLED - устаревшее имя, оставлено для совместимости",
 		"; HIGHLIGHT_MODEL_ENABLED - glow на модели лидера (0/1)",
 		"	HIGHLIGHT_MODEL_ENABLED = 1",
 		"; HIGHLIGHT_INTERVAL - интервал подсветки лидера (0.1..5.0)",
@@ -1281,8 +1286,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				copy(g_szWarmUpMusicDir, charsmax(g_szWarmUpMusicDir), value);
 			if (equal(key, "WARMUP_TIME"))
 				copy(g_szWarmUpTimeMode, charsmax(g_szWarmUpTimeMode), value);
-			if (equal(key, "HIGHLIGHT_ENABLED"))
-				g_bHighlightEnabled = bool:clamp(str_to_num(value), 0, 1);
+			if (equal(key, "HIGHLIGHT_ENABLED") || equal(key, "HIGHLIGHT_RING_ENABLED"))
+				g_bHighlightRingEnabled = bool:clamp(str_to_num(value), 0, 1);
 			if (equal(key, "HIGHLIGHT_MODEL_ENABLED"))
 				g_bHighlightModelEnabled = bool:clamp(str_to_num(value), 0, 1);
 			if (equal(key, "HIGHLIGHT_INTERVAL"))
@@ -1513,7 +1518,7 @@ stock FreezePlayersBeforeWarmupResults()
 stock StripPlayersWeaponsBeforeWarmupResults()
 {
 	new iPlayers[MAX_PLAYERS], iNum;
-	get_players(iPlayers, iNum, "ch");
+	get_players(iPlayers, iNum, "h");
 
 	for (new i; i < iNum; i++)
 	{
@@ -1522,6 +1527,10 @@ stock StripPlayersWeaponsBeforeWarmupResults()
 			continue;
 
 		strip_user_weapons(id);
+		set_pev(id, pev_weapons, 0);
+		set_member(id, m_flNextAttack, get_gametime() + 8.0);
+		set_entvar(id, var_viewmodel, "");
+		set_entvar(id, var_weaponmodel, "");
 	}
 }
 
