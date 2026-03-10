@@ -1650,7 +1650,6 @@ stock FinishWarmupAndRestart()
 	remove_task(TASK_HIGHLIGHT_LEADER);
 	HideWarmupWeaponSpriteForAll();
 	ResetWarmupLeaderModelRendering();
-	UnfreezePlayersAfterWarmupResults();
 	g_bWarmupRestartPending = true;
 	g_bWarmupCompleted = true;
 	g_bFirstKillHappened = false;
