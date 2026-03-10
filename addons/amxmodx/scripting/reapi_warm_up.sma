@@ -330,10 +330,7 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 	{
 		new iLeaderReward = max(g_iCurrentLeaderKillReward, 0);
 		if (iLeaderReward > 0)
-		{
 			g_iPlayerAward[Attacker] += iLeaderReward;
-			ShowLeaderKillReward(Attacker, iLeaderReward);
-		}
 
 		g_iCurrentLeaderKillReward += g_iLeaderKillRewardStep;
 	}
@@ -424,12 +421,6 @@ stock ShowLeaderRewardHud(Float:flStartY)
 
 	set_dhudmessage(.red = 255, .green = 200, .blue = 0, .x = -1.0, .y = flStartY + 0.03, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
 	show_dhudmessage(0, "НАГРАДА ЗА УБИЙСТВО - %d$", max(g_iCurrentLeaderKillReward, 0));
-}
-
-stock ShowLeaderKillReward(id, iReward)
-{
-	set_hudmessage(0, 255, 0, 0.83, 0.86, 0, 0.0, 1.5, 0.0, 0.0, 3);
-	show_hudmessage(id, "+%d$ за убийство лидера (выплата после разминки)", iReward);
 }
 
 // Периодически запускает подсветку лидера после первого убийства.
