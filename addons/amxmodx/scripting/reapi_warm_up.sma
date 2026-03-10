@@ -93,7 +93,7 @@ new Trie:g_tMusicTitle, Trie:g_tMusicDuration, Trie:g_tKnownMusicFiles;
 new HookChain:g_hCheckMapConditions, HookChain:g_hDropPlayerItem, HookChain:g_hOnSpawnEquip, HookChain:g_hKilled;
 
 new g_pDefaultCvars[sizeof(g_eCvarsToDisable)][64], g_pCvar[CVARS];
-new g_szWarmUpDescription[64], g_szWarmUpTrack[MAX_TRACK_TITLE_LEN + 1], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", g_szWarmUpTimeMode[16] = "AUTO", Float:g_flMaxHealth, g_iCountDown, g_iWarmUpTrackTime, g_iSection;
+new g_szWarmUpDescription[64], g_szWarmUpTrack[MAX_TRACK_TITLE_LEN + 1], g_szWarmUpWeaponSprite[24], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", g_szWarmUpTimeMode[16] = "AUTO", Float:g_flMaxHealth, g_iCountDown, g_iWarmUpTrackTime, g_iSection;
 new g_szWarmUpConfigPath[PLATFORM_MAX_PATH];
 
 /* top 5*/
@@ -120,8 +120,11 @@ new g_iHighlightColor[3] = {255, 0, 0};
 new g_iHighlightModelColor[3] = {255, 0, 0};
 new g_iWarmupResultsFadeAlpha = 180;
 new g_iMsgScreenFade;
+new g_iMsgStatusIcon;
 new bool:g_bWarmupRestartPending;
 new bool:g_bWarmupCompleted;
+new bool:g_bWarmupWeaponSpriteEnabled = true;
+new g_iWarmupWeaponSpriteColor[3] = {0, 160, 0};
 new bool:g_bLeaderModeEnabled = true;
 new g_iLeaderKillRewardStart = 300;
 new g_iLeaderKillRewardStep = 100;
@@ -156,6 +159,7 @@ public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR, URL, DESCRIPTIONPLUGIN);
 	g_iMsgScreenFade = get_user_msgid("ScreenFade");
+	g_iMsgStatusIcon = get_user_msgid("StatusIcon");
 	
 	register_event("TextMsg", "event_game_commencing", "a", "2=#Game_Commencing");
 	
@@ -239,6 +243,7 @@ public CSGameRules_CheckMapConditions()
 	
 	copy(g_szWarmUpDescription, charsmax(g_szWarmUpDescription), aWarm[DESCRIPTION]);
 	copy(g_szWarmUpTrack, charsmax(g_szWarmUpTrack), aWarm[TRACK]);
+	ResolveWarmupWeaponSprite(aWarm[GUNS], g_szWarmUpWeaponSprite, charsmax(g_szWarmUpWeaponSprite));
 
 	new bool:bRandomTrackPlayed = false;
 	if (g_szMapWarmUpMusic[0])
@@ -282,6 +287,8 @@ public CSGameRules_CheckMapConditions()
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
 		pause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
+
+	ShowWarmupWeaponSpriteToAll();
 	
 	// Fallback: если папка с музыкой пуста, играем трек из конфигурации.
 	if (!bRandomTrackPlayed && aWarm[MUSIC][0]) {
@@ -390,6 +397,8 @@ public Show_Timer()
 
 		set_dhudmessage( .red = 255, .green = 0, .blue = 0, .x = -1.0, .y = 0.01, .effects = 0, .fxtime = 0.0, .holdtime = 1.1, .fadeintime = 0.0, .fadeouttime = 0.0);
 		show_dhudmessage(0, "%s", g_szWarmUpDescription);
+		ShowWarmupWeaponSpriteToAll();
+
 		if(!g_szWarmUpTrack[0] || g_iWarmUpTrackTime <= 0){
 			set_dhudmessage( .red = 0, .green = 255, .blue = 0, .x = -1.0, .y = 0.04, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
 			show_dhudmessage(0, "РАЗМИНКА ЗАКОНЧИТСЯ ЧЕРЕЗ %i СЕК", g_iCountDown);
@@ -403,6 +412,114 @@ public Show_Timer()
 		}
 
 	}
+}
+
+stock ResolveWarmupWeaponSprite(const szGunList[], szSprite[], iSpriteLen)
+{
+	szSprite[0] = '^0';
+
+	new szInput[128], szWeaponToken[16];
+	copy(szInput, charsmax(szInput), szGunList);
+
+	while (argbreak(szInput, szWeaponToken, charsmax(szWeaponToken), szInput, charsmax(szInput)) != -1)
+	{
+		if (!szWeaponToken[0] || equali(szWeaponToken, "knife"))
+			continue;
+
+		if (WeaponTokenToSprite(szWeaponToken, szSprite, iSpriteLen))
+			return;
+	}
+
+	copy(szSprite, iSpriteLen, "d_knife");
+}
+
+stock bool:WeaponTokenToSprite(const szWeapon[], szSprite[], iSpriteLen)
+{
+	if (equali(szWeapon, "glock18")) return bool:copy(szSprite, iSpriteLen, "d_glock18");
+	if (equali(szWeapon, "usp")) return bool:copy(szSprite, iSpriteLen, "d_usp");
+	if (equali(szWeapon, "p228")) return bool:copy(szSprite, iSpriteLen, "d_p228");
+	if (equali(szWeapon, "deagle")) return bool:copy(szSprite, iSpriteLen, "d_deagle");
+	if (equali(szWeapon, "fiveseven")) return bool:copy(szSprite, iSpriteLen, "d_fiveseven");
+	if (equali(szWeapon, "elite")) return bool:copy(szSprite, iSpriteLen, "d_elite");
+	if (equali(szWeapon, "m3")) return bool:copy(szSprite, iSpriteLen, "d_m3");
+	if (equali(szWeapon, "xm1014")) return bool:copy(szSprite, iSpriteLen, "d_xm1014");
+	if (equali(szWeapon, "tmp")) return bool:copy(szSprite, iSpriteLen, "d_tmp");
+	if (equali(szWeapon, "mac10")) return bool:copy(szSprite, iSpriteLen, "d_mac10");
+	if (equali(szWeapon, "ump45")) return bool:copy(szSprite, iSpriteLen, "d_ump45");
+	if (equali(szWeapon, "mp5") || equali(szWeapon, "mp5navy")) return bool:copy(szSprite, iSpriteLen, "d_mp5navy");
+	if (equali(szWeapon, "p90")) return bool:copy(szSprite, iSpriteLen, "d_p90");
+	if (equali(szWeapon, "galil")) return bool:copy(szSprite, iSpriteLen, "d_galil");
+	if (equali(szWeapon, "famas")) return bool:copy(szSprite, iSpriteLen, "d_famas");
+	if (equali(szWeapon, "ak47")) return bool:copy(szSprite, iSpriteLen, "d_ak47");
+	if (equali(szWeapon, "m4a1")) return bool:copy(szSprite, iSpriteLen, "d_m4a1");
+	if (equali(szWeapon, "scout")) return bool:copy(szSprite, iSpriteLen, "d_scout");
+	if (equali(szWeapon, "sg552")) return bool:copy(szSprite, iSpriteLen, "d_sg552");
+	if (equali(szWeapon, "aug")) return bool:copy(szSprite, iSpriteLen, "d_aug");
+	if (equali(szWeapon, "sg550")) return bool:copy(szSprite, iSpriteLen, "d_sg550");
+	if (equali(szWeapon, "g3sg1")) return bool:copy(szSprite, iSpriteLen, "d_g3sg1");
+	if (equali(szWeapon, "awp")) return bool:copy(szSprite, iSpriteLen, "d_awp");
+	if (equali(szWeapon, "m249")) return bool:copy(szSprite, iSpriteLen, "d_m249");
+	if (equali(szWeapon, "hegrenade") || equali(szWeapon, "grenade")) return bool:copy(szSprite, iSpriteLen, "d_grenade");
+	if (equali(szWeapon, "flash")) return bool:copy(szSprite, iSpriteLen, "d_flashbang");
+	if (equali(szWeapon, "sgren")) return bool:copy(szSprite, iSpriteLen, "d_smokegrenade");
+
+	return false;
+}
+
+stock ShowWarmupWeaponSpriteToAll()
+{
+	for (new id = 1; id <= MaxClients; id++)
+	{
+		if (!is_user_connected(id))
+			continue;
+
+		ShowWarmupWeaponSprite(id);
+	}
+}
+
+stock HideWarmupWeaponSpriteForAll()
+{
+	for (new id = 1; id <= MaxClients; id++)
+	{
+		if (!is_user_connected(id))
+			continue;
+
+		HideWarmupWeaponSprite(id);
+	}
+}
+
+stock ShowWarmupWeaponSprite(id)
+{
+	if (!g_iMsgStatusIcon || !is_user_connected(id))
+		return;
+
+	if (!g_bWarmupWeaponSpriteEnabled || !g_szWarmUpWeaponSprite[0])
+	{
+		HideWarmupWeaponSprite(id);
+		return;
+	}
+
+	message_begin(MSG_ONE, g_iMsgStatusIcon, {0, 0, 0}, id);
+	write_byte(1);
+	write_string(g_szWarmUpWeaponSprite);
+	write_byte(g_iWarmupWeaponSpriteColor[0]);
+	write_byte(g_iWarmupWeaponSpriteColor[1]);
+	write_byte(g_iWarmupWeaponSpriteColor[2]);
+	message_end();
+}
+
+stock HideWarmupWeaponSprite(id)
+{
+	if (!g_iMsgStatusIcon || !is_user_connected(id) || !g_szWarmUpWeaponSprite[0])
+		return;
+
+	message_begin(MSG_ONE, g_iMsgStatusIcon, {0, 0, 0}, id);
+	write_byte(0);
+	write_string(g_szWarmUpWeaponSprite);
+	write_byte(0);
+	write_byte(0);
+	write_byte(0);
+	message_end();
 }
 
 stock ShowLeaderRewardHud(Float:flStartY)
@@ -988,6 +1105,10 @@ stock CreateDefaultConfigFile()
 		"	HIGHLIGHT_COLOR = 0 255 0",
 		"; HIGHLIGHT_MODEL_COLOR - цвет glow модели (R G B)",
 		"	HIGHLIGHT_MODEL_COLOR = 255 0 0",
+		"; WEAPON_SPRITE_ENABLED - показывать спрайт оружия разминки (0/1)",
+		"	WEAPON_SPRITE_ENABLED = 1",
+		"; WEAPON_SPRITE_COLOR - цвет спрайта оружия разминки (R G B)",
+		"	WEAPON_SPRITE_COLOR = 0 160 0",
 		"; RESULTS_FADE_ALPHA - затемнение экрана при итогах (0..255)",
 		"	RESULTS_FADE_ALPHA = 180",
 		"; LEADER_MODE_ENABLED - использовать режим с лидером (0/1)",
@@ -1106,6 +1227,10 @@ public bool:values(INIParser:handle, const key[], const value[])
 				ParseHighlightColor(value);
 			if (equal(key, "HIGHLIGHT_MODEL_COLOR"))
 				ParseHighlightModelColor(value);
+			if (equal(key, "WEAPON_SPRITE_ENABLED"))
+				g_bWarmupWeaponSpriteEnabled = bool:clamp(str_to_num(value), 0, 1);
+			if (equal(key, "WEAPON_SPRITE_COLOR"))
+				ParseWarmupWeaponSpriteColor(value);
 			if (equal(key, "RESULTS_FADE_ALPHA"))
 				g_iWarmupResultsFadeAlpha = clamp(str_to_num(value), 0, 255);
 			if (equal(key, "LEADER_MODE_ENABLED"))
@@ -1215,6 +1340,16 @@ stock ParseHighlightModelColor(const szValue[])
 		g_iHighlightModelColor[i] = clamp(str_to_num(szColor[i]), 0, 255);
 }
 
+stock ParseWarmupWeaponSpriteColor(const szValue[])
+{
+	new szColor[3][12];
+	if (explode_string(szValue, " ", szColor, sizeof(szColor), charsmax(szColor[])) < 3)
+		return;
+
+	for (new i; i < sizeof(g_iWarmupWeaponSpriteColor); i++)
+		g_iWarmupWeaponSpriteColor[i] = clamp(str_to_num(szColor[i]), 0, 255);
+}
+
 /*top 5*/
 // Сбрасывает статистику и рендер игрока при входе на сервер.
 public client_putinserver(id)
@@ -1224,6 +1359,9 @@ public client_putinserver(id)
 	g_iPlayerKills[id] = 0;
 	g_iPlayerAward[id] = 0;
 	ResetLeaderModelRendering(id);
+
+	if (!g_bWarmupCompleted)
+		ShowWarmupWeaponSprite(id);
 }
 
 // Сбрасывает лидера/рендер при выходе игрока.
@@ -1272,6 +1410,7 @@ public fnCompareDamage()
 	// сортировка массива
 	SortCustom2D(g_arrData, sizeof(g_arrData), "SortRoundDamage");
 	remove_task(TASK_HIGHLIGHT_LEADER);
+	HideWarmupWeaponSpriteForAll();
 	ResetWarmupLeaderModelRendering();
 	g_iHighlightedLeader = 0;
 	FreezePlayersBeforeWarmupResults();
@@ -1484,6 +1623,7 @@ stock FinishWarmupAndRestart()
 {
 	remove_task(0);
 	remove_task(TASK_HIGHLIGHT_LEADER);
+	HideWarmupWeaponSpriteForAll();
 	ResetWarmupLeaderModelRendering();
 	UnfreezePlayersAfterWarmupResults();
 	g_bWarmupRestartPending = true;
