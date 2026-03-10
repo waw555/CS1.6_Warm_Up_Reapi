@@ -4,8 +4,8 @@
 #include <reapi>
 
 #define PLUGIN "[ReAPI] Warm UP"
-#define VERSION "1.0.0.0-23.11.2025"
-#define AUTHOR "Emma Jule"
+#define VERSION "1.0-10.03.2026"
+#define AUTHOR "Emma Jule, WAW555, CODEX"
 #define URL "None"
 #define DESCRIPTIONPLUGIN "Plugin for Warm Up"
 
