@@ -126,6 +126,7 @@ new bool:g_bWarmupCompleted;
 new bool:g_bWarmupWeaponSpriteEnabled = true;
 new g_iWarmupWeaponSpriteColor[3] = {0, 160, 0};
 new bool:g_bLeaderModeEnabled = true;
+new g_iFirstKillReward = 300;
 new g_iLeaderKillRewardStart = 300;
 new g_iLeaderKillRewardStep = 100;
 new g_iLeaderRewardGrowByLeaderKill = 50;
@@ -339,7 +340,12 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 
 	if (bLeaderKilled || bFirstLeaderKill)
 	{
-		new iLeaderReward = max(g_iCurrentLeaderKillReward, g_iLeaderKillRewardStart);
+		new iLeaderReward;
+		if (bFirstLeaderKill)
+			iLeaderReward = g_iFirstKillReward;
+		else
+			iLeaderReward = max(g_iCurrentLeaderKillReward, g_iLeaderKillRewardStart);
+
 		if (iLeaderReward > 0)
 			g_iPlayerAward[Attacker] += iLeaderReward;
 
@@ -1118,6 +1124,8 @@ stock CreateDefaultConfigFile()
 		"	RESULTS_FADE_ALPHA = 180",
 		"; LEADER_MODE_ENABLED - использовать режим с лидером (0/1)",
 		"	LEADER_MODE_ENABLED = 1",
+		"; FIRST_KILL_REWARD - награда в $ за первое убийство на разминке",
+		"	FIRST_KILL_REWARD = 300",
 		"; LEADER_KILL_REWARD_START - стартовая награда в $ за убийство лидера",
 		"	LEADER_KILL_REWARD_START = 300",
 		"; LEADER_KILL_REWARD_STEP - увеличение награды после каждого убийства лидера",
@@ -1265,6 +1273,8 @@ public bool:values(INIParser:handle, const key[], const value[])
 				g_iWarmupResultsFadeAlpha = clamp(str_to_num(value), 0, 255);
 			if (equal(key, "LEADER_MODE_ENABLED"))
 				g_bLeaderModeEnabled = bool:clamp(str_to_num(value), 0, 1);
+			if (equal(key, "FIRST_KILL_REWARD"))
+				g_iFirstKillReward = clamp(str_to_num(value), 0, 16000);
 			if (equal(key, "LEADER_KILL_REWARD_START"))
 				g_iLeaderKillRewardStart = clamp(str_to_num(value), 0, 16000);
 			if (equal(key, "LEADER_KILL_REWARD_STEP"))
