@@ -576,7 +576,7 @@ stock ShowLeaderRewardHud(Float:flStartY)
 	get_user_name(g_iWarmupLeader, szLeaderName, charsmax(szLeaderName));
 
 	set_dhudmessage(.red = 255, .green = 255, .blue = 0, .x = -1.0, .y = flStartY, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
-	show_dhudmessage(0, "ЛИДЕР - %s", szLeaderName);
+	show_dhudmessage(0, "РАЗЫСКИВАЕТСЯ - %s", szLeaderName);
 
 	set_dhudmessage(.red = 255, .green = 200, .blue = 0, .x = -1.0, .y = flStartY + 0.03, .effects = 0, .fxtime = 0.0, .holdtime = 1.0, .fadeintime = 0.0, .fadeouttime = 0.1);
 	show_dhudmessage(0, "НАГРАДА ЗА УБИЙСТВО - %d$", max(g_iCurrentLeaderKillReward, 0));
