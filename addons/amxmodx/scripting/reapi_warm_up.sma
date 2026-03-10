@@ -326,6 +326,7 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 	new iLeaderBeforeKill = g_iWarmupLeader;
 	new bool:bLeaderExists = IsPlayer(iLeaderBeforeKill) && is_user_connected(iLeaderBeforeKill);
 	new bool:bLeaderKilled = bLeaderExists && (Victim == iLeaderBeforeKill);
+	new bool:bFirstLeaderKill = !bLeaderExists;
 
 	if (!bLeaderExists && g_iCurrentLeaderKillReward <= 0)
 		g_iCurrentLeaderKillReward = g_iLeaderKillRewardStart;
@@ -336,13 +337,14 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 	if (bLeaderExists && Attacker == iLeaderBeforeKill && !bLeaderKilled)
 		g_iCurrentLeaderKillReward += g_iLeaderRewardGrowByLeaderKill;
 
-	if (bLeaderKilled)
+	if (bLeaderKilled || bFirstLeaderKill)
 	{
 		new iLeaderReward = max(g_iCurrentLeaderKillReward, g_iLeaderKillRewardStart);
 		if (iLeaderReward > 0)
 			g_iPlayerAward[Attacker] += iLeaderReward;
 
-		g_iCurrentLeaderKillReward += g_iLeaderKillRewardStep;
+		if (bLeaderKilled)
+			g_iCurrentLeaderKillReward += g_iLeaderKillRewardStep;
 	}
 
 	if (!bLeaderExists || bLeaderKilled)
