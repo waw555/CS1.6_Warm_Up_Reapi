@@ -1,4 +1,5 @@
 #include <amxmisc>
+#include <cstrike>
 #include <fakemeta>
 #include <fun>
 #include <reapi>
@@ -132,6 +133,7 @@ new g_iFirstKillReward = 300;
 new g_iLeaderKillRewardStart = 300;
 new g_iLeaderKillRewardStep = 100;
 new g_iLeaderRewardGrowByLeaderKill = 50;
+new g_iKillReward = 50;
 new g_iCurrentLeaderKillReward;
 
 new const UNKNOWN_ARTIST_TITLE[] = "НЕИЗВЕСТНЫЙ ИСПОЛНИТЕЛЬ";
@@ -292,6 +294,8 @@ public CSGameRules_CheckMapConditions()
 	for (new i; i < ArraySize(g_aPlugins); i++)
 		pause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 
+	ResetWarmupMoneyForAll();
+
 	ShowWarmupWeaponSpriteToAll();
 	
 	// Fallback: если папка с музыкой пуста, играем трек из конфигурации.
@@ -323,6 +327,7 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 	if (!g_bLeaderModeEnabled)
 	{
 		g_iPlayerKills[Attacker]++;
+		AddWarmupReward(Attacker, g_iKillReward);
 		g_bFirstKillHappened = true;
 		return;
 	}
@@ -336,6 +341,7 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 		g_iCurrentLeaderKillReward = g_iLeaderKillRewardStart;
 
 	g_iPlayerKills[Attacker]++;
+	AddWarmupReward(Attacker, g_iKillReward);
 	g_bFirstKillHappened = true;
 
 	if (bLeaderExists && Attacker == iLeaderBeforeKill && !bLeaderKilled)
@@ -350,7 +356,7 @@ public CBasePlayer_Killed(Victim, Attacker, gib)
 			iLeaderReward = max(g_iCurrentLeaderKillReward, g_iLeaderKillRewardStart);
 
 		if (iLeaderReward > 0)
-			g_iPlayerAward[Attacker] += iLeaderReward;
+			AddWarmupReward(Attacker, iLeaderReward);
 
 		if (bLeaderKilled)
 			g_iCurrentLeaderKillReward += g_iLeaderKillRewardStep;
@@ -1438,7 +1444,10 @@ public client_putinserver(id)
 	ResetLeaderModelRendering(id);
 
 	if (!g_bWarmupCompleted)
+	{
+		SetMoneyNoReward(id, 0);
 		ShowWarmupWeaponSprite(id);
+	}
 }
 
 // Сбрасывает лидера/рендер при выходе игрока.
@@ -1611,6 +1620,7 @@ public CSGameRules_RestartRound_Post()
 	g_bWarmupAwardsGranted = true;
 
 	new iPlayers[MAX_PLAYERS], iNum, iPlayer;
+	new iStartMoney = get_pcvar_num(get_cvar_pointer("mp_startmoney"));
 	
 	get_players(iPlayers, iNum, "h");
 	
@@ -1623,7 +1633,14 @@ public CSGameRules_RestartRound_Post()
 			g_arrData[i][AWARD] = 0;
 			continue;
 		}
-		rg_add_account(g_arrData[i][PLAYER_ID], g_arrData[i][AWARD], AS_ADD, true);
+		new iTargetMoney = iStartMoney + g_arrData[i][AWARD];
+		new iDelta = iTargetMoney - cs_get_user_money(iPlayer);
+
+		if (iDelta > 0)
+			give_money(iPlayer, iDelta);
+		else
+			SetMoneyNoReward(iPlayer, iTargetMoney);
+
 		g_arrData[i][AWARD] = 0;
 	}
 }
@@ -1642,9 +1659,8 @@ public ShowStats()
 	new iPlayer = g_arrData[g_iPlayerTop][PLAYER_ID];
 	get_user_name(iPlayer, szName, charsmax(szName));
 
-	new iWarmupAward = g_arrData[g_iPlayerTop][KILLS] * 50 + g_arrData[g_iPlayerTop][DAMAGE];
-	new iLeaderAward = g_iPlayerAward[iPlayer];
-	new iTotalAward = iWarmupAward + iLeaderAward;
+	new iWarmupAward = g_iPlayerAward[iPlayer];
+	new iTotalAward = iWarmupAward;
 	g_arrData[g_iPlayerTop][AWARD] = iTotalAward;
 	new iCount = g_iPlayerTop + 1;
 
@@ -1660,7 +1676,7 @@ public ShowStats()
 		case 4:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.20, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d + %d = %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iWarmupAward, iLeaderAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1668,7 +1684,7 @@ public ShowStats()
 		case 5:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.25, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d + %d = %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iWarmupAward, iLeaderAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1676,7 +1692,7 @@ public ShowStats()
 		case 6:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.30, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d + %d = %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iWarmupAward, iLeaderAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1684,7 +1700,7 @@ public ShowStats()
 		case 7:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.35, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d + %d = %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iWarmupAward, iLeaderAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1692,7 +1708,7 @@ public ShowStats()
 		case 8:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.40, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d + %d = %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iWarmupAward, iLeaderAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1766,6 +1782,51 @@ stock FinishWarmupAndRestart()
 stock ClearDHUDMessages()
         for (new iDHUD = 0; iDHUD < 8; iDHUD++)
                 show_dhudmessage(0, ""); 
+
+stock ResetWarmupMoneyForAll()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "h");
+
+	for (new i; i < iNum; i++)
+		SetMoneyNoReward(iPlayers[i], 0);
+}
+
+stock SetMoneyNoReward(id, money)
+{
+	if (!IsPlayer(id) || !is_user_connected(id))
+		return;
+
+	cs_set_user_money(id, money, 0);
+
+	message_begin(MSG_ONE, get_user_msgid("Money"), _, id);
+	write_long(money);
+	write_byte(0);
+	message_end();
+}
+
+stock AddWarmupReward(id, amount)
+{
+	if (amount <= 0 || !IsPlayer(id) || !is_user_connected(id))
+		return;
+
+	g_iPlayerAward[id] += amount;
+	give_money(id, amount);
+}
+
+public give_money(id, amount)
+{
+	if (!IsPlayer(id) || !is_user_connected(id))
+		return;
+
+	new money = cs_get_user_money(id) + amount;
+	cs_set_user_money(id, money, 0);
+
+	message_begin(MSG_ONE, get_user_msgid("Money"), _, id);
+	write_long(money);
+	write_byte(1);
+	message_end();
+}
 
 // Сбрасывает рендер игрока к стандартному виду.
 stock ResetLeaderModelRendering(id)
