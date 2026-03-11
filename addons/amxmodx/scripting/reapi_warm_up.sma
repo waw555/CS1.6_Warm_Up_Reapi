@@ -1822,7 +1822,9 @@ stock AddWarmupReward(id, amount)
 		return;
 
 	g_iPlayerAward[id] += amount;
-	give_money(id, amount);
+	// Во время разминки сервер может сбрасывать деньги при респавне,
+	// поэтому всегда синхронизируем HUD с накопленной суммой награды.
+	SetMoneyNoReward(id, g_iPlayerAward[id]);
 }
 
 public give_money(id, amount)
