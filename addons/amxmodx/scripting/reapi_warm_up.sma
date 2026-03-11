@@ -1668,10 +1668,10 @@ public ShowStats()
 	new iPlayer = g_arrData[g_iPlayerTop][PLAYER_ID];
 	get_user_name(iPlayer, szName, charsmax(szName));
 
-	new iWarmupAward = g_iPlayerAward[iPlayer];
-	new iBaseAward = g_iPlayerBaseAward[iPlayer];
-	new iLeaderKillAward = g_iPlayerLeaderKillAward[iPlayer];
-	new iTotalAward = iWarmupAward;
+	new iKills = g_arrData[g_iPlayerTop][KILLS];
+	new iDamage = g_arrData[g_iPlayerTop][DAMAGE];
+	new iBonusAward = g_iPlayerBaseAward[iPlayer] + g_iPlayerLeaderKillAward[iPlayer];
+	new iTotalAward = (iKills * iDamage) + iBonusAward;
 	g_arrData[g_iPlayerTop][AWARD] = iTotalAward;
 	new iCount = g_iPlayerTop + 1;
 
@@ -1687,7 +1687,7 @@ public ShowStats()
 		case 4:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.20, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$ + ЛИДЕР: %d$ (ИТОГО: %d$)", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iBaseAward, iLeaderKillAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА - %d * УРОН - %d + НАГРАДА - %d = %d$", iCount, szName, iKills, iDamage, iBonusAward, iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1695,7 +1695,7 @@ public ShowStats()
 		case 5:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.25, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$ + ЛИДЕР: %d$ (ИТОГО: %d$)", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iBaseAward, iLeaderKillAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА - %d * УРОН - %d + НАГРАДА - %d = %d$", iCount, szName, iKills, iDamage, iBonusAward, iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1703,7 +1703,7 @@ public ShowStats()
 		case 6:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.30, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$ + ЛИДЕР: %d$ (ИТОГО: %d$)", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iBaseAward, iLeaderKillAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА - %d * УРОН - %d + НАГРАДА - %d = %d$", iCount, szName, iKills, iDamage, iBonusAward, iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1711,7 +1711,7 @@ public ShowStats()
 		case 7:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.35, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$ + ЛИДЕР: %d$ (ИТОГО: %d$)", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iBaseAward, iLeaderKillAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА - %d * УРОН - %d + НАГРАДА - %d = %d$", iCount, szName, iKills, iDamage, iBonusAward, iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
@@ -1719,7 +1719,7 @@ public ShowStats()
 		case 8:
 		{
 			set_dhudmessage( .red = 255, .green = 255, .blue = 255, .x = -1.0, .y = 0.40, .effects = 0, .fxtime = 0.0, .holdtime = 10.0, .fadeintime = 0.0, .fadeouttime = 0.0);
-			show_dhudmessage(0, "%d: %s - УБИЙСТВА: %d - УРОН: %d - НАГРАДА: %d$ + ЛИДЕР: %d$ (ИТОГО: %d$)", iCount, szName, g_arrData[g_iPlayerTop][KILLS], g_arrData[g_iPlayerTop][DAMAGE], iBaseAward, iLeaderKillAward, iTotalAward);
+			show_dhudmessage(0, "%d: %s - УБИЙСТВА - %d * УРОН - %d + НАГРАДА - %d = %d$", iCount, szName, iKills, iDamage, iBonusAward, iTotalAward);
 			client_cmd(0, "spk sound/weapons/deagle-1.wav");
 			g_iCounter++;
 			g_iPlayerTop++;
