@@ -124,6 +124,7 @@ new g_iMsgScreenFade;
 new g_iMsgStatusIcon;
 new bool:g_bWarmupRestartPending;
 new bool:g_bWarmupCompleted;
+new bool:g_bWarmupAwardsGranted;
 new bool:g_bWarmupWeaponSpriteEnabled = true;
 new g_iWarmupWeaponSpriteColor[3] = {0, 160, 0};
 new bool:g_bLeaderModeEnabled = true;
@@ -285,6 +286,7 @@ public CSGameRules_CheckMapConditions()
 	g_iHighlightedLeader = 0;
 	g_iCurrentLeaderKillReward = g_iLeaderKillRewardStart;
 	g_bWarmupRestartPending = false;
+	g_bWarmupAwardsGranted = false;
 	
 	// 
 	for (new i; i < ArraySize(g_aPlugins); i++)
@@ -1603,6 +1605,11 @@ public CSGameRules_RestartRound_Post()
 	UnfreezePlayersAfterWarmupResults();
 	g_bWarmupRestartPending = false;
 
+	if (g_bWarmupAwardsGranted)
+		return;
+
+	g_bWarmupAwardsGranted = true;
+
 	new iPlayers[MAX_PLAYERS], iNum, iPlayer;
 	
 	get_players(iPlayers, iNum, "h");
@@ -1613,6 +1620,7 @@ public CSGameRules_RestartRound_Post()
 		if(!is_user_connected(iPlayer) || !IsPlayer(iPlayer) || g_arrData[i][AWARD] <= 0)
 		{
 			// Награда не выдается невалидным/отключившимся игрокам.
+			g_arrData[i][AWARD] = 0;
 			continue;
 		}
 		rg_add_account(g_arrData[i][PLAYER_ID], g_arrData[i][AWARD], AS_ADD, true);
