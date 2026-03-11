@@ -1822,9 +1822,16 @@ public give_money(id, amount)
 	new money = cs_get_user_money(id) + amount;
 	cs_set_user_money(id, money, 0);
 
+	// Показываем прибавку как в стандартной игре (например, +300$).
+	message_begin(MSG_ONE, get_user_msgid("Money"), _, id);
+	write_long(amount);
+	write_byte(1);
+	message_end();
+
+	// Следом отправляем текущее итоговое количество денег.
 	message_begin(MSG_ONE, get_user_msgid("Money"), _, id);
 	write_long(money);
-	write_byte(1);
+	write_byte(0);
 	message_end();
 }
 
