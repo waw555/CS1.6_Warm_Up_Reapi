@@ -1597,11 +1597,11 @@ public SortRoundDamage(const elem1[], const elem2[])
 // Выдает денежные награды игрокам после рестарта раунда.
 public CSGameRules_RestartRound_Post()
 {
-	if (g_bWarmupRestartPending)
-	{
-		UnfreezePlayersAfterWarmupResults();
-		g_bWarmupRestartPending = false;
-	}
+	if (!g_bWarmupRestartPending)
+		return;
+
+	UnfreezePlayersAfterWarmupResults();
+	g_bWarmupRestartPending = false;
 
 	new iPlayers[MAX_PLAYERS], iNum, iPlayer;
 	
@@ -1616,6 +1616,7 @@ public CSGameRules_RestartRound_Post()
 			continue;
 		}
 		rg_add_account(g_arrData[i][PLAYER_ID], g_arrData[i][AWARD], AS_ADD, true);
+		g_arrData[i][AWARD] = 0;
 	}
 }
 
