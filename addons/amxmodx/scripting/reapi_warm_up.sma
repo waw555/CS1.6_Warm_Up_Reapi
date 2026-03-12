@@ -20,6 +20,7 @@ new const WARMUP_CONFIG_FILE[] = "configs/plugins/warm_up.ini"; // Путь к �
 
 #define TE_BEAMCYLINDER 21
 #define TASK_HIGHLIGHT_LEADER 31415
+#define TASK_PLAYER_WARMUP_INIT 32000
 
 enum _:ePlayerData
 {
@@ -1474,21 +1475,31 @@ public client_putinserver(id)
 	ResetLeaderModelRendering(id);
 
 	if (!g_bWarmupCompleted)
-	{
-		SetMoneyNoReward(id, 0);
-		ShowWarmupWeaponSprite(id);
-	}
+		set_task(0.1, "Task_InitPlayerWarmupState", TASK_PLAYER_WARMUP_INIT + id);
 }
 
 // Сбрасывает лидера/рендер при выходе игрока.
 public client_disconnected(id)
 {
+	remove_task(TASK_PLAYER_WARMUP_INIT + id);
+
 	if (id == g_iWarmupLeader)
 		g_iWarmupLeader = 0;
 	if (id == g_iHighlightedLeader)
 		g_iHighlightedLeader = 0;
 
 	ResetLeaderModelRendering(id);
+}
+
+public Task_InitPlayerWarmupState(iTaskId)
+{
+	new id = iTaskId - TASK_PLAYER_WARMUP_INIT;
+
+	if (!IsPlayer(id) || !is_user_connected(id) || g_bWarmupCompleted)
+		return;
+
+	SetMoneyNoReward(id, 0);
+	ShowWarmupWeaponSprite(id);
 }
 
 // Накапливает урон атакующего.
