@@ -1647,6 +1647,7 @@ public CSGameRules_RestartRound_Post()
 		return;
 
 	UnfreezePlayersAfterWarmupResults();
+	EnsurePlayersHaveDefaultPistols();
 	g_bWarmupRestartPending = false;
 
 	if (g_bWarmupAwardsGranted)
@@ -1852,6 +1853,37 @@ stock ForceDefaultPistolsIfEmpty()
 
 	if (!szCtSecondary[0])
 		set_cvar_string("mp_ct_default_weapons_secondary", "usp");
+}
+
+stock EnsurePlayersHaveDefaultPistols()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "ah");
+
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		if (HasSecondaryWeapon(id))
+			continue;
+
+		new TeamName:iTeam = get_member(id, m_iTeam);
+		if (iTeam == TEAM_TERRORIST)
+			rg_give_item(id, "weapon_glock18");
+		else if (iTeam == TEAM_CT)
+			rg_give_item(id, "weapon_usp");
+	}
+}
+
+stock bool:HasSecondaryWeapon(id)
+{
+	return bool:(
+		user_has_weapon(id, CSW_USP)
+		|| user_has_weapon(id, CSW_GLOCK18)
+		|| user_has_weapon(id, CSW_P228)
+		|| user_has_weapon(id, CSW_DEAGLE)
+		|| user_has_weapon(id, CSW_FIVESEVEN)
+		|| user_has_weapon(id, CSW_ELITE)
+	);
 }
 
 stock SetAlivePlayersHealth(Float:flHealth)
