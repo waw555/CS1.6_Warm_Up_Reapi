@@ -72,7 +72,6 @@ new const g_eCvarsToDisable[][][] =
 	{ "mp_give_player_c4", "0" },
 	{ "mp_weapons_allow_map_placed", "0" },
 	{ "mp_scoreboard_showmoney", "-1" },
-	{ "mp_scoreboard_showhealth", "-1" },
 	
 	// Backwards
 	{ "mp_free_armor", "0" },
@@ -394,6 +393,8 @@ public CSGameRules_CheckMapConditions()
 		pause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 
 	ResetWarmupMoneyForAll();
+	ResetWarmupStatsForAll();
+	ApplyWarmupHealthToAllAlive();
 
 	ShowWarmupWeaponSpriteToAll();
 	
@@ -1659,13 +1660,15 @@ public CSGameRules_RestartRound_Post()
 	for(new i=0; i < iNum; i++)
 	{
 		iPlayer = g_arrData[i][PLAYER_ID];
-		if(!is_user_connected(iPlayer) || !IsPlayer(iPlayer) || g_arrData[i][AWARD] <= 0)
+		if(!is_user_connected(iPlayer) || !IsPlayer(iPlayer))
 		{
 			// Награда не выдается невалидным/отключившимся игрокам.
 			g_arrData[i][AWARD] = 0;
 			continue;
 		}
-		new iTargetMoney = iStartMoney + g_arrData[i][AWARD];
+
+		new iBonusAward = max(0, g_arrData[i][AWARD]);
+		new iTargetMoney = iStartMoney + iBonusAward;
 		new iDelta = iTargetMoney - get_member(iPlayer, m_iAccount);
 
 		if (iDelta > 0)
@@ -1675,6 +1678,8 @@ public CSGameRules_RestartRound_Post()
 
 		g_arrData[i][AWARD] = 0;
 	}
+
+	ResetScoreboardStatsForAll();
 }
 
 // Пошагово выводит DHUD-таблицу победителей разминки и завершает warmup.
@@ -1817,6 +1822,48 @@ stock FinishWarmupAndRestart()
 stock ClearDHUDMessages()
         for (new iDHUD = 0; iDHUD < 8; iDHUD++)
                 show_dhudmessage(0, ""); 
+
+stock ApplyWarmupHealthToAllAlive()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "ah");
+
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		set_entvar(id, var_max_health, g_flMaxHealth);
+		set_entvar(id, var_health, g_flMaxHealth);
+	}
+}
+
+stock ResetWarmupStatsForAll()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "h");
+
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		g_iPlayerDmg[id] = 0;
+		g_iPlayerKills[id] = 0;
+		g_iPlayerAward[id] = 0;
+		g_iPlayerBaseAward[id] = 0;
+		g_iPlayerLeaderKillAward[id] = 0;
+	}
+}
+
+stock ResetScoreboardStatsForAll()
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "h");
+
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		set_user_frags(id, 0);
+		cs_set_user_deaths(id, 0);
+	}
+}
 
 stock ResetWarmupMoneyForAll()
 {
