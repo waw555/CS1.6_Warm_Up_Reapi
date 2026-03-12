@@ -119,7 +119,7 @@ new g_iRingSprite;
 new bool:g_bFirstKillHappened;
 new g_iWarmupLeader;
 new g_iHighlightedLeader;
-new bool:g_bHighlightRingEnabled = true;
+new bool:g_bHighlightRingEnabled = false;
 new bool:g_bHighlightModelEnabled = true;
 new Float:g_flHighlightInterval = 5.0;
 new Float:g_flHighlightRadius = 85.0;
@@ -167,7 +167,7 @@ new const g_szDefaultConfig[][] =
 	"; ROUND_END_SOUND - путь к звуку (от папки sound) для сообщения окончания разминки",
 	"	ROUND_END_SOUND = radio/rounddraw.wav",
 	"; HIGHLIGHT_RING_ENABLED - включить кольцо подсветки лидера (0/1)",
-	"	HIGHLIGHT_RING_ENABLED = 1",
+	"	HIGHLIGHT_RING_ENABLED = 0",
 	"; HIGHLIGHT_ENABLED - устаревшее имя, оставлено для совместимости",
 	"; HIGHLIGHT_MODEL_ENABLED - glow на модели лидера (0/1)",
 	"	HIGHLIGHT_MODEL_ENABLED = 1",
