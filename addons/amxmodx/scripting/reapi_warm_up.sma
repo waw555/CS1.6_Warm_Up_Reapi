@@ -897,7 +897,7 @@ stock LoadWarmUpMusic()
 
 	if (!hDir)
 	{
-		RewriteMusicConfigSection();
+		EnsureMusicSectionExists();
 		return;
 	}
 
@@ -950,7 +950,25 @@ stock LoadWarmUpMusic()
 	if (g_szMapWarmUpMusic[0])
 		precache_generic(fmt("sound/%s", g_szMapWarmUpMusic));
 
-	RewriteMusicConfigSection();
+	EnsureMusicSectionExists();
+}
+
+// Гарантирует наличие секции MUSIC_FILES без перезаписи остального конфига.
+stock EnsureMusicSectionExists()
+{
+	if (!g_szWarmUpConfigPath[0])
+		return;
+
+	new szLine[256], iLen;
+	for (new i; read_file(g_szWarmUpConfigPath, i, szLine, charsmax(szLine), iLen); i++)
+	{
+		trim(szLine);
+		if (equal(szLine, "[MUSIC_FILES]"))
+			return;
+	}
+
+	write_file(g_szWarmUpConfigPath, "", -1);
+	write_file(g_szWarmUpConfigPath, "[MUSIC_FILES]", -1);
 }
 
 // Читает ID3v1 теги mp3 и формирует название трека.
