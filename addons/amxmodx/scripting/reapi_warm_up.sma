@@ -1803,6 +1803,8 @@ stock FinishWarmupAndRestart()
 	for (new i; i < sizeof(g_eCvarsToDisable); i++)
 		set_pcvar_string(get_cvar_pointer(g_eCvarsToDisable[i][0]), g_pDefaultCvars[i]);
 
+	ForceDefaultPistolsIfEmpty();
+
 	if (g_pCvar[PAUSE_STATS])
 	{
 		set_cvar_num("csstats_pause", 0);
@@ -1813,6 +1815,7 @@ stock FinishWarmupAndRestart()
 		unpause("ac", fmt("%a", ArrayGetStringHandle(g_aPlugins, i)));
 
 	ClearDHUDMessages();
+	SetAlivePlayersHealth(0.0);
 
 	rg_round_end(0.0, WINSTATUS_DRAW, ROUND_NONE, g_szRoundEndText, g_szRoundEndSound, false);
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
@@ -1835,6 +1838,31 @@ stock ApplyWarmupHealthToAllAlive()
 		new id = iPlayers[i];
 		set_entvar(id, var_max_health, g_flMaxHealth);
 		set_entvar(id, var_health, g_flMaxHealth);
+	}
+}
+
+stock ForceDefaultPistolsIfEmpty()
+{
+	new szTSecondary[64], szCtSecondary[64];
+	get_cvar_string("mp_t_default_weapons_secondary", szTSecondary, charsmax(szTSecondary));
+	get_cvar_string("mp_ct_default_weapons_secondary", szCtSecondary, charsmax(szCtSecondary));
+
+	if (!szTSecondary[0])
+		set_cvar_string("mp_t_default_weapons_secondary", "glock18");
+
+	if (!szCtSecondary[0])
+		set_cvar_string("mp_ct_default_weapons_secondary", "usp");
+}
+
+stock SetAlivePlayersHealth(Float:flHealth)
+{
+	new iPlayers[MAX_PLAYERS], iNum;
+	get_players(iPlayers, iNum, "ah");
+
+	for (new i; i < iNum; i++)
+	{
+		new id = iPlayers[i];
+		set_entvar(id, var_health, flHealth);
 	}
 }
 
