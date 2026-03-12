@@ -72,8 +72,8 @@ new const g_eCvarsToDisable[][][] =
 	{ "mp_hostage_hurtable", "0" },
 	{ "mp_give_player_c4", "0" },
 	{ "mp_weapons_allow_map_placed", "0" },
-	{ "mp_scoreboard_showmoney", "1" },
-	{ "mp_scoreboard_showhealth", "1" },
+	{ "mp_scoreboard_showmoney", "0" },
+	{ "mp_scoreboard_showhealth", "0" },
 	
 	// Backwards
 	{ "mp_free_armor", "0" },
