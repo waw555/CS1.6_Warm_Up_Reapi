@@ -408,7 +408,7 @@ public Show_Timer()
 			set_cvar_num("aes_track_pause", 0);
 		}
 		
-		set_cvar_num("sv_restart", 1);
+		rg_round_end(0.0, WINSTATUS_DRAW);
 		if (g_pCvar[RESTART] > 1)
 			set_task(1.5, "@restart", .flags = "a", .repeat = g_pCvar[RESTART] - 1);
 		
@@ -685,7 +685,7 @@ stock HighlightWarmupLeader()
 {
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
 	client_cmd(0, "stopsound; mp3 stop");
-	set_cvar_num("sv_restart", 1);
+	rg_round_end(0.0, WINSTATUS_DRAW);
 }
 
 // Разбирает список оружия и применяет соответствующие cvar выдачи.
@@ -1643,7 +1643,7 @@ public CSGameRules_RestartRound_Post()
 			continue;
 		}
 		new iTargetMoney = iStartMoney + g_arrData[i][AWARD];
-		new iDelta = iTargetMoney - cs_get_user_money(iPlayer);
+		new iDelta = iTargetMoney - get_member(iPlayer, m_iAccount);
 
 		if (iDelta > 0)
 			give_money(iPlayer, iDelta);
@@ -1783,7 +1783,7 @@ stock FinishWarmupAndRestart()
 
 	ClearDHUDMessages();
 
-	set_cvar_num("sv_restart", 1);
+	rg_round_end(0.0, WINSTATUS_DRAW);
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
 	client_cmd(0, "stopsound; mp3 stop");
 }
@@ -1808,7 +1808,7 @@ stock SetMoneyNoReward(id, money)
 	if (!IsPlayer(id) || !is_user_connected(id))
 		return;
 
-	cs_set_user_money(id, money, 0);
+	rg_add_account(id, money, AS_SET, false);
 
 	message_begin(MSG_ONE, get_user_msgid("Money"), _, id);
 	write_long(money);
@@ -1832,8 +1832,9 @@ public give_money(id, amount)
 	if (!IsPlayer(id) || !is_user_connected(id))
 		return;
 
-	new money = cs_get_user_money(id) + amount;
-	cs_set_user_money(id, money, 1);
+	new money = get_member(id, m_iAccount);
+	money += amount;
+	rg_add_account(id, money, AS_SET);
 }
 
 // Сбрасывает рендер игрока к стандартному виду.
