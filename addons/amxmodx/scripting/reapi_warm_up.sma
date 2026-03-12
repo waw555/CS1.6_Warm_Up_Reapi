@@ -1648,7 +1648,7 @@ public CSGameRules_RestartRound_Post()
 		return;
 
 	UnfreezePlayersAfterWarmupResults();
-	set_task(0.2, "Task_EnsurePlayersHaveDefaultPistols", TASK_ENSURE_DEFAULT_PISTOLS);
+	//set_task(0.2, "Task_EnsurePlayersHaveDefaultPistols", TASK_ENSURE_DEFAULT_PISTOLS);
 	g_bWarmupRestartPending = false;
 
 	if (g_bWarmupAwardsGranted)
@@ -1792,6 +1792,8 @@ stock FinishWarmupAndRestart()
 {
 	remove_task(0);
 	remove_task(TASK_HIGHLIGHT_LEADER);
+	DisableHookChain(g_hDropPlayerItem);
+	DisableHookChain(g_hOnSpawnEquip);
 	g_bWarmupResultsActive = false;
 	DisableHookChain(g_hPreThink);
 	HideWarmupWeaponSpriteForAll();
@@ -1803,8 +1805,7 @@ stock FinishWarmupAndRestart()
 	g_iHighlightedLeader = 0;
 	g_iCounter = 0;
 	g_iPlayerTop = 0;
-	DisableHookChain(g_hDropPlayerItem);
-	DisableHookChain(g_hOnSpawnEquip);
+	
 
 	if (g_pCvar[AUTO_AMMO])
 		DisableHookChain(g_hKilled);
@@ -1812,7 +1813,7 @@ stock FinishWarmupAndRestart()
 	for (new i; i < sizeof(g_eCvarsToDisable); i++)
 		set_pcvar_string(get_cvar_pointer(g_eCvarsToDisable[i][0]), g_pDefaultCvars[i]);
 
-	ForceDefaultPistolsIfEmpty();
+	//ForceDefaultPistolsIfEmpty();
 
 	if (g_pCvar[PAUSE_STATS])
 	{
@@ -1826,7 +1827,8 @@ stock FinishWarmupAndRestart()
 	ClearDHUDMessages();
 	SetAlivePlayersHealth(0.0);
 
-	rg_round_end(0.0, WINSTATUS_DRAW, ROUND_NONE, g_szRoundEndText, g_szRoundEndSound, false);
+	//rg_round_end(0.5, WINSTATUS_DRAW, ROUND_NONE, g_szRoundEndText, g_szRoundEndSound, false);
+	set_cvar_num("sv_restart", 1);
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
 	client_cmd(0, "stopsound; mp3 stop");
 }
