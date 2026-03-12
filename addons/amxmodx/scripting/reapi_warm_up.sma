@@ -96,6 +96,7 @@ new HookChain:g_hPreThink;
 
 new g_pDefaultCvars[sizeof(g_eCvarsToDisable)][64], g_pCvar[CVARS];
 new g_szWarmUpDescription[64], g_szWarmUpTrack[MAX_TRACK_TITLE_LEN + 1], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", g_szWarmUpTimeMode[16] = "AUTO", Float:g_flMaxHealth, g_iCountDown, g_iWarmUpTrackTime, g_iSection;
+new g_szRoundEndText[64] = "НАЧИНАЕМ", g_szRoundEndSound[MAX_RESOURCE_PATH_LENGTH] = "radio/rounddraw.wav";
 new g_szWarmUpWeaponSprites[32][24], g_iWarmUpWeaponSpritesCount;
 new g_szWarmUpConfigPath[PLATFORM_MAX_PATH];
 
@@ -157,6 +158,7 @@ public plugin_precache()
 		set_fail_state("Something went wrong");
 
 	LoadWarmUpMusic();
+	precache_sound(g_szRoundEndSound);
 	
 	precache_sound("weapons/deagle-1.wav");
 	precache_sound("events/task_complete.wav");
@@ -419,7 +421,7 @@ public Show_Timer()
 			set_cvar_num("aes_track_pause", 0);
 		}
 		
-		rg_round_end(0.0, WINSTATUS_DRAW);
+		rg_round_end(0.0, WINSTATUS_DRAW, ROUND_NONE, g_szRoundEndText, g_szRoundEndSound, false);
 		if (g_pCvar[RESTART] > 1)
 			set_task(1.5, "@restart", .flags = "a", .repeat = g_pCvar[RESTART] - 1);
 		
@@ -696,7 +698,7 @@ stock HighlightWarmupLeader()
 {
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
 	client_cmd(0, "stopsound; mp3 stop");
-	rg_round_end(0.0, WINSTATUS_DRAW);
+	rg_round_end(0.0, WINSTATUS_DRAW, ROUND_NONE, g_szRoundEndText, g_szRoundEndSound, false);
 }
 
 // Разбирает список оружия и применяет соответствующие cvar выдачи.
@@ -1162,6 +1164,10 @@ stock CreateDefaultConfigFile()
 		"	MUSIC_FOLDER = ms/Warm_Up",
 		"; WARMUP_TIME - AUTO или число секунд (10..90)",
 		"	WARMUP_TIME = AUTO",
+		"; ROUND_END_TEXT - текст сообщения при окончании разминки (rg_round_end)",
+		"	ROUND_END_TEXT = НАЧИНАЕМ",
+		"; ROUND_END_SOUND - путь к звуку (от папки sound) для сообщения окончания разминки",
+		"	ROUND_END_SOUND = radio/rounddraw.wav",
 		"; HIGHLIGHT_RING_ENABLED - включить кольцо подсветки лидера (0/1)",
 		"	HIGHLIGHT_RING_ENABLED = 1",
 		"; HIGHLIGHT_ENABLED - устаревшее имя, оставлено для совместимости",
@@ -1312,6 +1318,10 @@ public bool:values(INIParser:handle, const key[], const value[])
 				copy(g_szWarmUpMusicDir, charsmax(g_szWarmUpMusicDir), value);
 			if (equal(key, "WARMUP_TIME"))
 				copy(g_szWarmUpTimeMode, charsmax(g_szWarmUpTimeMode), value);
+			if (equal(key, "ROUND_END_TEXT"))
+				copy(g_szRoundEndText, charsmax(g_szRoundEndText), value);
+			if (equal(key, "ROUND_END_SOUND"))
+				copy(g_szRoundEndSound, charsmax(g_szRoundEndSound), value);
 			if (equal(key, "HIGHLIGHT_ENABLED") || equal(key, "HIGHLIGHT_RING_ENABLED"))
 				g_bHighlightRingEnabled = bool:clamp(str_to_num(value), 0, 1);
 			if (equal(key, "HIGHLIGHT_MODEL_ENABLED"))
@@ -1786,7 +1796,7 @@ stock FinishWarmupAndRestart()
 
 	ClearDHUDMessages();
 
-	rg_round_end(0.0, WINSTATUS_DRAW);
+	rg_round_end(0.0, WINSTATUS_DRAW, ROUND_NONE, g_szRoundEndText, g_szRoundEndSound, false);
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
 	client_cmd(0, "stopsound; mp3 stop");
 }
