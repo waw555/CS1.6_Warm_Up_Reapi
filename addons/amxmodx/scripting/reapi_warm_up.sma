@@ -72,6 +72,7 @@ new const g_eCvarsToDisable[][][] =
 	{ "mp_give_player_c4", "0" },
 	{ "mp_weapons_allow_map_placed", "0" },
 	{ "mp_scoreboard_showmoney", "-1" },
+	{ "mp_scoreboard_showhealth", "-1" },
 	
 	// Backwards
 	{ "mp_free_armor", "0" },
@@ -788,7 +789,8 @@ stock HighlightWarmupLeader()
 {
 	set_cvar_num("sv_maxspeed", g_iOriginal_sv_maxspeed);
 	client_cmd(0, "stopsound; mp3 stop");
-	rg_round_end(0.0, WINSTATUS_DRAW, ROUND_NONE, g_szRoundEndText, g_szRoundEndSound, false);
+	server_cmd("sv_restart 1");
+	server_exec();
 }
 
 // Разбирает список оружия и применяет соответствующие cvar выдачи.
