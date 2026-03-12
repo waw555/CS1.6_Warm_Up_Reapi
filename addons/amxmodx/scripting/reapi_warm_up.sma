@@ -92,6 +92,7 @@ new const g_eCvarsToDisable[][][] =
 new Array:g_aWarm, Array:g_aPlugins, Array:g_aMusicFilesOnDisk;
 new Trie:g_tMusicTitle, Trie:g_tMusicDuration, Trie:g_tKnownMusicFiles;
 new HookChain:g_hCheckMapConditions, HookChain:g_hDropPlayerItem, HookChain:g_hOnSpawnEquip, HookChain:g_hKilled;
+new HookChain:g_hPreThink;
 
 new g_pDefaultCvars[sizeof(g_eCvarsToDisable)][64], g_pCvar[CVARS];
 new g_szWarmUpDescription[64], g_szWarmUpTrack[MAX_TRACK_TITLE_LEN + 1], g_szMapWarmUpMusic[MAX_RESOURCE_PATH_LENGTH], g_szWarmUpMusicDir[MAX_RESOURCE_PATH_LENGTH] = "ms/Warm_Up", g_szWarmUpTimeMode[16] = "AUTO", Float:g_flMaxHealth, g_iCountDown, g_iWarmUpTrackTime, g_iSection;
@@ -128,6 +129,7 @@ new g_iMsgStatusIcon;
 new bool:g_bWarmupRestartPending;
 new bool:g_bWarmupCompleted;
 new bool:g_bWarmupAwardsGranted;
+new bool:g_bWarmupResultsActive;
 new bool:g_bWarmupWeaponSpriteEnabled = true;
 new g_iWarmupWeaponSpriteColor[3] = {0, 160, 0};
 new bool:g_bLeaderModeEnabled = true;
@@ -185,6 +187,8 @@ public plugin_init()
 	} else {
 		//#pragma unused g_hKilled
 	}
+
+	DisableHookChain(g_hPreThink = RegisterHookChain(RG_CBasePlayer_PreThink, "CBasePlayer_PreThink", false));
 }
 
 // Разблокирует условия карты и сбрасывает флаг m_bNotKilled живым игрокам.
@@ -206,6 +210,8 @@ public CSGameRules_CheckMapConditions()
 
 	if (g_bWarmupCompleted)
 		return;
+
+	g_bWarmupResultsActive = false;
 
 	new iWarmModesCount = ArraySize(g_aWarm);
 	if (iWarmModesCount <= 0)
@@ -1513,7 +1519,8 @@ public fnCompareDamage()
 	HideWarmupWeaponSpriteForAll();
 	ResetWarmupLeaderModelRendering();
 	g_iHighlightedLeader = 0;
-	StripPlayersWeaponsBeforeWarmupResults();
+	g_bWarmupResultsActive = true;
+	EnableHookChain(g_hPreThink);
 	FreezePlayersBeforeWarmupResults();
 
 	client_cmd(0, "spk sound/events/task_complete.wav");
@@ -1536,26 +1543,6 @@ stock FreezePlayersBeforeWarmupResults()
 		set_entvar(id, var_maxspeed, 1.0);
 		set_entvar(id, var_flags, get_entvar(id, var_flags) | FL_FROZEN);
 		ShowWarmupResultFade(id);
-	}
-}
-
-// Накладывает затемнение экрана игроку во время итогов.
-stock StripPlayersWeaponsBeforeWarmupResults()
-{
-	new iPlayers[MAX_PLAYERS], iNum;
-	get_players(iPlayers, iNum, "h");
-
-	for (new i; i < iNum; i++)
-	{
-		new id = iPlayers[i];
-		if (!is_user_alive(id))
-			continue;
-
-		strip_user_weapons(id);
-		set_pev(id, pev_weapons, 0);
-		set_member(id, m_flNextAttack, get_gametime() + 8.0);
-		set_entvar(id, var_viewmodel, "");
-		set_entvar(id, var_weaponmodel, "");
 	}
 }
 
@@ -1607,6 +1594,16 @@ stock UnfreezePlayersAfterWarmupResults()
 }
 
 // функция сравнения для сортировки
+
+public CBasePlayer_PreThink(const id)
+{
+	if (!g_bWarmupResultsActive || !is_user_alive(id))
+		return HC_CONTINUE;
+
+	set_member(id, m_flNextAttack, get_gametime() + 0.2);
+	return HC_CONTINUE;
+}
+
 // Функция сортировки игроков по урону (по убыванию).
 public SortRoundDamage(const elem1[], const elem2[])
 {
@@ -1758,6 +1755,8 @@ stock FinishWarmupAndRestart()
 {
 	remove_task(0);
 	remove_task(TASK_HIGHLIGHT_LEADER);
+	g_bWarmupResultsActive = false;
+	DisableHookChain(g_hPreThink);
 	HideWarmupWeaponSpriteForAll();
 	ResetWarmupLeaderModelRendering();
 	g_bWarmupRestartPending = true;
