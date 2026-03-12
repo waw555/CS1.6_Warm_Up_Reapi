@@ -21,6 +21,7 @@ new const WARMUP_CONFIG_FILE[] = "configs/plugins/warm_up.ini"; // Путь к �
 #define TE_BEAMCYLINDER 21
 #define TASK_HIGHLIGHT_LEADER 31415
 #define TASK_PLAYER_WARMUP_INIT 32000
+#define TASK_ENSURE_DEFAULT_PISTOLS 33000
 
 enum _:ePlayerData
 {
@@ -71,8 +72,8 @@ new const g_eCvarsToDisable[][][] =
 	{ "mp_hostage_hurtable", "0" },
 	{ "mp_give_player_c4", "0" },
 	{ "mp_weapons_allow_map_placed", "0" },
-	{ "mp_scoreboard_showmoney", "-1" },
-	{ "mp_scoreboard_showhealth", "-1" },
+	{ "mp_scoreboard_showmoney", "1" },
+	{ "mp_scoreboard_showhealth", "1" },
 	
 	// Backwards
 	{ "mp_free_armor", "0" },
@@ -1647,7 +1648,7 @@ public CSGameRules_RestartRound_Post()
 		return;
 
 	UnfreezePlayersAfterWarmupResults();
-	EnsurePlayersHaveDefaultPistols();
+	set_task(0.2, "Task_EnsurePlayersHaveDefaultPistols", TASK_ENSURE_DEFAULT_PISTOLS);
 	g_bWarmupRestartPending = false;
 
 	if (g_bWarmupAwardsGranted)
@@ -1683,6 +1684,13 @@ public CSGameRules_RestartRound_Post()
 	}
 
 	ResetScoreboardStatsForAll();
+}
+
+
+public Task_EnsurePlayersHaveDefaultPistols()
+{
+	ForceDefaultPistolsIfEmpty();
+	EnsurePlayersHaveDefaultPistols();
 }
 
 // Пошагово выводит DHUD-таблицу победителей разминки и завершает warmup.
